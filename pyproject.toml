@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "computer-use-subq"
+version = "0.1.0"
+description = "Universal Autonomous Desktop Voice Agent using SubQ Snap Reflex and Gemini Multimodal Computer Use"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = [
+    "typing-extensions>=4.8.0",
+    "httpx>=0.27.0",
+    "websockets>=13.0",
+    "sounddevice>=0.5.0",
+    "numpy>=1.24.0",
+    "silero-vad>=6.0.0",
+    "onnxruntime>=1.16.0",
+    "pyautogui>=0.9.54",
+    "pytweening>=1.2.0",
+    "pillow>=10.0.0",
+    "mss>=9.0.0",
+    "agno>=3.1.5",
+    "google-genai>=2.31.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/yapwrap", "reflex_agent"]
