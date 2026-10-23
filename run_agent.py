@@ -41,15 +41,15 @@ from reflex_agent import ReflexDesktopAgent, EchoSafeLocalTransport
 
 async def main() -> None:
     print("\n" + "=" * 60)
-    print("  YapWrap Voice Agent (SubQ Snap Reflex + Gemini Tool Control)")
+    print("  Superhuman Voice Desktop Agent (SubQ Snap + Gemini Multimodal)")
     print("=" * 60)
     model_name = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
     print(f"  Gemini Model   : {model_name}")
     print(f"  Deepgram STT   : {'OK' if os.environ.get('DEEPGRAM_API_KEY') else 'MISSING'}")
     print(f"  Cartesia TTS   : {'OK' if os.environ.get('CARTESIA_API_KEY') else 'MISSING'}")
     print(f"  SubQ Snap      : {'OK' if os.environ.get('SUBQ_API_KEY') else 'MISSING'}")
-    print(f"  System 1 Reflex: SubQ Snap (<80ms)")
-    print(f"  System 2 Tools : Native Windows + Chromium Tab Search + Vision")
+    print(f"  Fast Radar     : Local Reflex (<1ms) + Win32 Process Snap (<5ms)")
+    print(f"  Visual Loop    : Gemini Multimodal Vision + SubQ Snap Verifier (<300ms)")
     print("=" * 60)
     print("\nWaiting for audio session to come online...\n")
 

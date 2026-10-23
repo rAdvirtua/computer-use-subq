@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 import os
 import time
-from typing import Dict, Optional, Tuple
+from typing import Optional, Tuple
 
 import httpx
 
@@ -12,22 +13,10 @@ logger = logging.getLogger("reflex.snap")
 
 _SNAP_URL = "https://api.subq.ai/v1/systemone"
 _SNAP_MODEL = "subq-snap-preview"
-_SNAP_TIMEOUT = 2.5
-
-_CRITERIA = {
-    "pause_resume": "User explicitly wants to pause, play, or resume media playback (e.g. 'pause', 'play', 'resume', 'stop playback')",
-    "mute_toggle": "User explicitly wants to mute or unmute audio (e.g. 'mute', 'unmute', 'silence audio')",
-    "volume_up": "User wants to increase audio volume (e.g. 'volume up', 'turn it up', 'louder')",
-    "volume_down": "User wants to decrease audio volume (e.g. 'volume down', 'turn it down', 'softer', 'quieter')",
-    "scroll_down": "User wants to scroll down the screen or page (e.g. 'scroll down', 'page down', 'scroll down a bit')",
-    "scroll_up": "User wants to scroll up the screen or page (e.g. 'scroll up', 'page up')",
-    "close_tab": "User wants to close the current tab or active window (e.g. 'close this', 'close the tab', 'close window')",
-    "fullscreen": "User wants to toggle fullscreen mode (e.g. 'fullscreen', 'exit fullscreen', 'make it full screen')",
-    "controller": "ANY other request: opening or switching apps, searching websites or YouTube, typing text, clicking items or buttons on screen, visual navigation, questions, or conversation",
-}
+_SNAP_TIMEOUT = 3.0
 
 
-class SnapReflex:
+class SnapVisualVerifier:
 
     def __init__(self, api_key: Optional[str] = None) -> None:
         self.api_key = api_key or os.environ.get("SUBQ_API_KEY", "")
@@ -53,32 +42,37 @@ class SnapReflex:
                     "model": _SNAP_MODEL,
                     "state": "startup warmup",
                     "questions": {
-                        "action": {
-                            "type": "choice",
-                            "instructions": "Warmup",
-                            "criteria": {"a": "warmup a", "b": "warmup b"},
+                        "warm": {
+                            "type": "noul",
+                            "instructions": "Warmup check",
+                            "criteria": {"true": "warm", "false": "cold"},
                         }
                     },
                 },
             )
-            logger.info("[Snap] Connection pool pre-warmed successfully.")
+            logger.info("Snap Visual Verifier pre-warmed successfully.")
         except Exception as exc:
-            logger.debug("[Snap] Warmup skipped: %s", exc)
+            logger.debug("Snap warmup skipped: %s", exc)
 
-    async def decide_action(self, user_text: str) -> Tuple[str, float, float]:
-        if not self.api_key:
-            return ("controller", 0.0, 0.0)
+    async def verify_action_success(self, goal: str, jpeg_bytes: bytes) -> Tuple[bool, float, float]:
+        if not self.api_key or not jpeg_bytes:
+            return (True, 1.0, 0.0)
 
         t0 = time.perf_counter()
+        b64_img = base64.b64encode(jpeg_bytes).decode("ascii")
 
         payload = {
             "model": _SNAP_MODEL,
-            "state": f'User said: "{user_text}"',
+            "state": f'Verify completion of visual computer action: "{goal}"',
+            "images": [{"mediaType": "image/jpeg", "base64": b64_img}],
             "questions": {
-                "action": {
-                    "type": "choice",
-                    "instructions": "Select the single best reflex hotkey or controller category.",
-                    "criteria": _CRITERIA,
+                "action_succeeded": {
+                    "type": "noul",
+                    "instructions": f"Looking at the screen, did the action '{goal}' succeed (e.g. video playing, dialog open, page loaded, element focused)?",
+                    "criteria": {
+                        "true": "The requested action succeeded and screen state reflects it",
+                        "false": "Screen is unchanged, failed, or action did not complete",
+                    },
                 }
             },
         }
@@ -90,15 +84,15 @@ class SnapReflex:
             elapsed = (time.perf_counter() - t0) * 1000
 
             data = resp.json()
-            ans = data.get("answers", {}).get("action", {})
-            choice = ans.get("choice", "controller")
-            confidence = float(ans.get("confidence", 0.0))
-            return (choice, confidence, elapsed)
+            ans = data.get("answers", {}).get("action_succeeded", {})
+            prob = float(ans.get("noul", 0.5))
+            succeeded = prob >= 0.50
+            return (succeeded, prob, elapsed)
 
         except Exception as exc:
             elapsed = (time.perf_counter() - t0) * 1000
-            logger.warning("[Snap Reflex] Error (%s) in %.0fms", exc, elapsed)
-            return ("controller", 0.0, elapsed)
+            logger.warning("Snap verification error (%s) in %.0fms", exc, elapsed)
+            return (True, 0.5, elapsed)
 
     async def close(self) -> None:
         if self._client is not None and not self._client.is_closed:

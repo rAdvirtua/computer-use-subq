@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import sys
 import time
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional, Tuple
 
 if sys.platform == "win32":
     try:
@@ -20,9 +21,9 @@ from agno.models.google import Gemini
 from yapwrap.core.base import BaseAgent
 from yapwrap.core.events import AgentEvent
 
-from .snap import SnapReflex
 from .vision import VisionComputerUse
 from .desktop import (
+    focus_app_by_process,
     open_app_or_game,
     search_or_open_website as desktop_search_or_open,
     switch_browser_tab as desktop_switch_tab,
@@ -34,11 +35,74 @@ from .desktop import (
 logger = logging.getLogger("reflex.agent")
 
 
+def _clean_spoken_text(text: str) -> str:
+    cleaned = text.lower().strip()
+    cleaned = re.sub(r"[^\w\s]", "", cleaned)
+    cleaned = re.sub(r"^(?:can you|could you|please|would you)?\s*", "", cleaned)
+    cleaned = re.sub(r"\s*(?:please|for me|now)?$", "", cleaned)
+    return cleaned.strip()
+
+
+def _check_local_hardware_reflex(text: str) -> Optional[Tuple[str, str]]:
+    c = _clean_spoken_text(text)
+
+    if c in ("pause", "play", "resume", "stop", "freeze", "pause the video", "play the video", "resume the video"):
+        press_key("space")
+        return ("pause_resume", "Toggled playback.")
+
+    elif c in ("mute", "unmute", "silence", "quiet", "mute audio", "silence audio"):
+        press_key("m")
+        return ("mute_toggle", "Toggled mute.")
+
+    elif c in ("volume up", "turn it up", "louder", "make it louder", "increase volume", "raise volume"):
+        press_key("volumeup")
+        return ("volume_up", "Volume up.")
+
+    elif c in ("volume down", "turn it down", "softer", "quieter", "make it softer", "lower volume", "decrease volume"):
+        press_key("volumedown")
+        return ("volume_down", "Volume down.")
+
+    elif c in ("scroll down", "page down", "scroll down a bit", "scroll a bit down"):
+        scroll_screen("down")
+        return ("scroll_down", "Scrolled down.")
+
+    elif c in ("scroll up", "page up", "scroll up a bit", "scroll a bit up"):
+        scroll_screen("up")
+        return ("scroll_up", "Scrolled up.")
+
+    elif c in ("close tab", "close window", "close this", "close the tab", "close current tab"):
+        press_key("ctrl+w")
+        return ("close_tab", "Closed tab.")
+
+    elif c in ("fullscreen", "full screen", "toggle fullscreen", "exit fullscreen"):
+        press_key("f")
+        return ("fullscreen", "Toggled fullscreen.")
+
+    return None
+
+
+def _check_local_app_or_tab_switch(text: str) -> Optional[str]:
+    c = _clean_spoken_text(text)
+
+    m_tab = re.search(r"^(?:switch to|go to|open|show)\s+(?:the\s+)?(.+?)\s+tab$", c)
+    if m_tab:
+        target_tab = m_tab.group(1).strip()
+        desktop_switch_tab(target_tab)
+        return f"Switched to {target_tab} tab."
+
+    m_app = re.search(r"^(?:switch to|go to|bring up|focus)\s+(?:the\s+)?(?:app\s+)?(.+)$", c)
+    if m_app:
+        target_app = m_app.group(1).strip()
+        if focus_app_by_process(target_app):
+            return f"Switched to {target_app}."
+
+    return None
+
+
 class ReflexDesktopAgent(BaseAgent):
 
     def __init__(self, model_id: str = "gemini-3-flash-preview") -> None:
         api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        self.snap = SnapReflex()
         self.vision = VisionComputerUse(api_key=api_key)
 
         vision_engine = self.vision
@@ -95,19 +159,24 @@ class ReflexDesktopAgent(BaseAgent):
         )
 
     async def warmup(self) -> None:
-        await self.snap.warmup()
+        await self.vision.warmup()
 
     async def respond(self, text: str) -> AsyncIterator[AgentEvent]:
         t0 = time.perf_counter()
 
-        action, conf, snap_ms = await self.snap.decide_action(text)
-        logger.info("[Snap] %s (%.0f%% conf, %.0fms) for '%s'", action, conf * 100, snap_ms, text)
-
-        if action != "controller" and conf >= 0.70:
-            ack = self._execute_reflex_action(action)
+        reflex = _check_local_hardware_reflex(text)
+        if reflex:
+            action, ack = reflex
             total_ms = (time.perf_counter() - t0) * 1000
-            print(f"\n⚡ [Snap Reflex] {action} ({conf:.0%} | {snap_ms:.0f}ms) -> Done in {total_ms:.0f}ms\n  ✅ {ack}", flush=True)
+            print(f"\n⚡ [Local Reflex] {action} -> Done in {total_ms:.1f}ms\n  ✅ {ack}", flush=True)
             yield AgentEvent.text(ack)
+            return
+
+        app_switch_ack = _check_local_app_or_tab_switch(text)
+        if app_switch_ack:
+            total_ms = (time.perf_counter() - t0) * 1000
+            print(f"\n⚡ [Process Radar] {app_switch_ack} -> Done in {total_ms:.1f}ms", flush=True)
+            yield AgentEvent.text(app_switch_ack)
             return
 
         print(f"\n🧠 [Controller Agent] Reasoning on: '{text}'...", flush=True)
@@ -128,32 +197,5 @@ class ReflexDesktopAgent(BaseAgent):
             else:
                 yield AgentEvent.text("Sorry, I had a momentary connection hiccup.")
 
-    def _execute_reflex_action(self, action: str) -> str:
-        if action == "pause_resume":
-            press_key("space")
-            return "Toggled playback."
-        elif action == "mute_toggle":
-            press_key("m")
-            return "Toggled mute."
-        elif action == "volume_up":
-            press_key("volumeup")
-            return "Volume up."
-        elif action == "volume_down":
-            press_key("volumedown")
-            return "Volume down."
-        elif action == "scroll_down":
-            scroll_screen("down")
-            return "Scrolled down."
-        elif action == "scroll_up":
-            scroll_screen("up")
-            return "Scrolled up."
-        elif action == "close_tab":
-            press_key("ctrl+w")
-            return "Closed tab."
-        elif action == "fullscreen":
-            press_key("f")
-            return "Toggled fullscreen."
-        return "Done."
-
     async def close(self) -> None:
-        await self.snap.close()
+        await self.vision.close()

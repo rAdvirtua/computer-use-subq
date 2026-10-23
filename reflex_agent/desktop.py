@@ -17,6 +17,34 @@ pyautogui.PAUSE = 0.15
 
 logger = logging.getLogger("reflex.desktop")
 _user32 = ctypes.windll.user32
+_kernel32 = ctypes.windll.kernel32
+
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+APP_ALIASES = {
+    "discord": ["discord.exe"],
+    "code": ["code.exe"],
+    "vscode": ["code.exe"],
+    "visual studio code": ["code.exe"],
+    "my code": ["code.exe"],
+    "spotify": ["spotify.exe"],
+    "music": ["spotify.exe"],
+    "steam": ["steam.exe"],
+    "notepad": ["notepad.exe"],
+    "notes": ["notepad.exe"],
+    "terminal": ["windowsterminal.exe", "powershell.exe", "cmd.exe"],
+    "powershell": ["powershell.exe"],
+    "cmd": ["cmd.exe"],
+    "browser": ["brave.exe", "chrome.exe", "msedge.exe", "firefox.exe", "opera.exe"],
+    "chrome": ["chrome.exe"],
+    "brave": ["brave.exe"],
+    "edge": ["msedge.exe"],
+    "firefox": ["firefox.exe"],
+    "calculator": ["calculatorapp.exe", "calc.exe"],
+    "settings": ["systemsettings.exe"],
+    "explorer": ["explorer.exe"],
+    "files": ["explorer.exe"],
+}
 
 
 def attach_to_input_desktop() -> bool:
@@ -30,42 +58,42 @@ def attach_to_input_desktop() -> bool:
     return False
 
 
-def get_visible_windows() -> List[Tuple[int, str]]:
+def get_open_process_windows() -> List[Tuple[int, str, str]]:
     attach_to_input_desktop()
-    results: List[Tuple[int, str]] = []
+    results: List[Tuple[int, str, str]] = []
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-    def _cb(hwnd: int, _: int) -> bool:
+    def enum_cb(hwnd: int, _: int) -> bool:
         if _user32.IsWindowVisible(hwnd):
             length = _user32.GetWindowTextLengthW(hwnd)
             if length > 0:
-                buf = ctypes.create_unicode_buffer(length + 1)
-                _user32.GetWindowTextW(hwnd, buf, length + 1)
-                title = buf.value.strip()
-                if title:
-                    results.append((hwnd, title))
+                pid = wintypes.DWORD()
+                _user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                h_proc = _kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
+                if h_proc:
+                    buf = ctypes.create_unicode_buffer(512)
+                    size = wintypes.DWORD(512)
+                    exe_name = ""
+                    if _kernel32.QueryFullProcessImageNameW(h_proc, 0, buf, ctypes.byref(size)):
+                        exe_name = buf.value.split("\\")[-1].lower()
+                    _kernel32.CloseHandle(h_proc)
+
+                    title_buf = ctypes.create_unicode_buffer(length + 1)
+                    _user32.GetWindowTextW(hwnd, title_buf, length + 1)
+                    title = title_buf.value.strip()
+
+                    if exe_name or title:
+                        results.append((hwnd, exe_name, title))
         return True
 
-    _user32.EnumWindows(_cb, 0)
+    _user32.EnumWindows(enum_cb, 0)
     return results
 
 
-def find_window_hwnd(query: str) -> Optional[Tuple[int, str]]:
-    q = query.lower().strip()
-    for hwnd, title in get_visible_windows():
-        if q in title.lower():
-            return hwnd, title
-    return None
-
-
-def focus_window(query: str) -> bool:
+def focus_window_hwnd(hwnd: int) -> bool:
     attach_to_input_desktop()
-    match = find_window_hwnd(query)
-    if not match:
+    if not _user32.IsWindow(hwnd):
         return False
-
-    hwnd, title = match
-    logger.info("Focusing window %r (hwnd=%d)", title, hwnd)
 
     if _user32.IsIconic(hwnd):
         _user32.ShowWindow(hwnd, 9)
@@ -75,14 +103,33 @@ def focus_window(query: str) -> bool:
     _user32.keybd_event(0x12, 0, 0, 0)
     _user32.SetForegroundWindow(hwnd)
     _user32.keybd_event(0x12, 0, 2, 0)
-    time.sleep(0.15)
+    time.sleep(0.08)
     return True
 
 
+def focus_app_by_process(query: str) -> bool:
+    clean = query.lower().strip()
+    target_exes = APP_ALIASES.get(clean, [clean + ".exe" if not clean.endswith(".exe") else clean])
+
+    proc_windows = get_open_process_windows()
+
+    for hwnd, exe, _ in proc_windows:
+        if exe in target_exes:
+            return focus_window_hwnd(hwnd)
+
+    for hwnd, exe, title in proc_windows:
+        if clean in exe or clean in title.lower():
+            return focus_window_hwnd(hwnd)
+
+    return False
+
+
 def focus_browser() -> bool:
-    for b in ("Brave", "Chrome", "Edge", "Firefox", "Opera"):
-        if focus_window(b):
-            return True
+    proc_windows = get_open_process_windows()
+    browser_exes = {"brave.exe", "chrome.exe", "msedge.exe", "firefox.exe", "opera.exe"}
+    for hwnd, exe, _ in proc_windows:
+        if exe in browser_exes:
+            return focus_window_hwnd(hwnd)
     return False
 
 
@@ -91,16 +138,16 @@ def switch_browser_tab(tab_name: str = "") -> str:
     clean_tab = tab_name.strip()
     logger.info("Switching to tab: %s", clean_tab)
     focus_browser()
-    time.sleep(0.12)
+    time.sleep(0.08)
 
     pyautogui.hotkey("ctrl", "shift", "a")
-    time.sleep(0.18)
+    time.sleep(0.15)
 
     if clean_tab and clean_tab.lower() not in ("check", "tabs", "all", "show", "open", ""):
         pyautogui.write(clean_tab, interval=0.02)
-        time.sleep(0.18)
+        time.sleep(0.15)
         pyautogui.press("enter")
-        time.sleep(0.1)
+        time.sleep(0.08)
         return f"Switched to {clean_tab} tab."
     else:
         return "Opened tab search for your open tabs."
@@ -111,13 +158,13 @@ def open_app_or_game(app_name: str) -> str:
     clean_name = app_name.strip()
     logger.info("Opening app/game: %s", clean_name)
 
-    if focus_window(clean_name):
+    if focus_app_by_process(clean_name):
         return f"Switched to {clean_name}."
 
     pyautogui.press("win")
-    time.sleep(0.2)
+    time.sleep(0.18)
     pyautogui.write(clean_name, interval=0.03)
-    time.sleep(0.3)
+    time.sleep(0.25)
     pyautogui.press("enter")
 
     try:
@@ -155,7 +202,7 @@ def search_or_open_website(query_or_url: str, site: str = "") -> str:
 
     logger.info("Opening URL: %s", url)
     os.system(f'start "" "{url}"')
-    time.sleep(0.5)
+    time.sleep(0.4)
     focus_browser()
     return f"Opened {label} in your browser."
 
@@ -187,17 +234,17 @@ def type_text(text: str, press_enter: bool = False) -> str:
     logger.info("Typing text: %s", text)
     pyautogui.write(text, interval=0.03)
     if press_enter:
-        time.sleep(0.12)
+        time.sleep(0.1)
         pyautogui.press("enter")
     return f"Typed '{text}'."
 
 
-def move_and_click(x: int, y: int, button: str = "left", duration: float = 0.4) -> str:
+def move_and_click(x: int, y: int, button: str = "left", duration: float = 0.35) -> str:
     attach_to_input_desktop()
     pyautogui.moveTo(x, y, duration=duration, tween=pytweening.easeInOutQuad)
-    time.sleep(0.12)
-    pyautogui.mouseDown(button=button)
-    time.sleep(0.06)
-    pyautogui.mouseUp(button=button)
     time.sleep(0.1)
+    pyautogui.mouseDown(button=button)
+    time.sleep(0.05)
+    pyautogui.mouseUp(button=button)
+    time.sleep(0.08)
     return f"Clicked at ({x}, {y})."

@@ -14,6 +14,8 @@ from google.genai import types
 import pyautogui
 import pytweening
 
+from .snap import SnapVisualVerifier
+
 logger = logging.getLogger("reflex.vision")
 
 _VISION_PROMPT = """You are an autonomous computer-use vision agent controlling a Windows PC.
@@ -90,12 +92,16 @@ class VisionComputerUse:
     def __init__(self, api_key: Optional[str] = None) -> None:
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         self._client = None
+        self.verifier = SnapVisualVerifier()
 
     def _get_client(self):
         if self._client is None:
             from google import genai
             self._client = genai.Client(api_key=self.api_key)
         return self._client
+
+    async def warmup(self) -> None:
+        await self.verifier.warmup()
 
     async def perceive_and_act(self, goal: str) -> str:
         screen = capture_screen()
@@ -145,7 +151,17 @@ class VisionComputerUse:
         if not data:
             return "Vision analysis failed to identify action."
 
-        return self._execute_action(data, sw, sh)
+        action_summary = self._execute_action(data, sw, sh)
+
+        time.sleep(0.2)
+        post_screen = capture_screen()
+        if post_screen:
+            post_jpeg = _screen_to_jpeg_bytes(post_screen, max_dim=800, quality=65)
+            succeeded, prob, snap_ms = await self.verifier.verify_action_success(goal, post_jpeg)
+            logger.info("[Snap Verifier] Outcome: %s (%.0f%% in %.0fms)", succeeded, prob * 100, snap_ms)
+            print(f"  ⚡ [Snap Verifier] Verified outcome: {prob:.0%} in {snap_ms:.0f}ms", flush=True)
+
+        return action_summary
 
     def _execute_action(self, data: dict, screen_w: int, screen_h: int) -> str:
         action = data.get("action", "done")
@@ -160,17 +176,17 @@ class VisionComputerUse:
             logger.info("[Vision] %s at (%d, %d): %s", action, target_x, target_y, reason)
             print(f"  🎯 [Vision Action] {action} at ({target_x}, {target_y}) — {reason}", flush=True)
 
-            pyautogui.moveTo(target_x, target_y, duration=0.5, tween=pytweening.easeInOutQuad)
-            time.sleep(0.12)
+            pyautogui.moveTo(target_x, target_y, duration=0.4, tween=pytweening.easeInOutQuad)
+            time.sleep(0.1)
 
             if action == "double_click":
                 pyautogui.doubleClick()
             else:
                 pyautogui.mouseDown()
-                time.sleep(0.06)
+                time.sleep(0.05)
                 pyautogui.mouseUp()
 
-            time.sleep(0.15)
+            time.sleep(0.1)
             return f"Clicked at ({target_x}, {target_y}): {reason}"
 
         elif action == "press_key":
@@ -187,11 +203,14 @@ class VisionComputerUse:
             print(f"  ⌨️ [Vision Action] Typing '{text}' — {reason}", flush=True)
             pyautogui.write(text, interval=0.03)
             if press_enter:
-                time.sleep(0.12)
+                time.sleep(0.1)
                 pyautogui.press("enter")
-            return f"Typed '{text}' : {reason}"
+            return f"Typed '{text}': {reason}"
 
         elif action == "done":
             return f"Goal completed: {reason}"
 
         return f"Completed visual action: {action}"
+
+    async def close(self) -> None:
+        await self.verifier.close()
