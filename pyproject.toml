@@ -18,6 +18,7 @@ dependencies = [
     "agno>=3.1.5",
     "google-genai>=2.31.0",
     "pydirectinput>=1.0.4",
+    "duckduckgo-search>=8.1.1",
 ]
 
 [tool.hatch.build.targets.wheel]

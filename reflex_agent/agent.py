@@ -23,6 +23,8 @@ from yapwrap.core.events import AgentEvent
 
 from .vision import VisionComputerUse
 from .game_copilot import AutonomousGameCopilot
+from .memory import global_memory
+from .research import research_game_knowledge
 from .desktop import (
     focus_app_by_process,
     open_app_or_game,
@@ -44,9 +46,8 @@ def _clean_spoken_text(text: str) -> str:
     cleaned = re.sub(r"[^\w\s]", "", cleaned)
     cleaned = re.sub(r"^(?:can you|could you|please|would you|just|hey|agent)?\s*", "", cleaned)
     cleaned = re.sub(r"\s*(?:please|for me|now|right now)?$", "", cleaned)
-    cleaned = re.sub(r"\b(?:piece|peace|breastpiece)\b", "space", cleaned)
-    cleaned = re.sub(r"\bsqueeze\s*(?:work|bar)?\b", "space bar", cleaned)
-    cleaned = re.sub(r"\bspace\s+where\b", "space bar", cleaned)
+    for misheard, intended in global_memory.get_stt_aliases().items():
+        cleaned = re.sub(rf"\b{re.escape(misheard)}\b", intended, cleaned)
     return cleaned.strip()
 
 
@@ -202,6 +203,12 @@ class ReflexDesktopAgent(BaseAgent):
             """Move a video game character in a direction (forward, backward, left, right) for a duration with optional sprinting."""
             return move_game(direction, duration=duration, sprint=sprint)
 
+        async def research_game_controls_or_guide(question: str, game_name: str = "Persona 3 Reload") -> str:
+            """Search the internet for PC keyboard controls, menu navigation guides, save mechanics, or walkthrough tips when confused about what to do in a game or app."""
+            return await research_game_knowledge(question, game_name)
+
+        learned_guidance = global_memory.get_learned_prompt_context()
+
         self.controller_agent = Agent(
             model=Gemini(id=model_id, api_key=api_key),
             tools=[
@@ -214,23 +221,27 @@ class ReflexDesktopAgent(BaseAgent):
                 move_game_character,
                 see_screen_and_act,
                 play_game_autonomously,
+                research_game_controls_or_guide,
             ],
             instructions=(
-                "You are an autonomous desktop voice assistant controlling a Windows PC. "
-                "Always use your tools to perform user requests: "
-                "- open_or_switch_app: opens or switches to an application or game like Discord, Steam, Spotify. "
-                "- search_or_open_website: searches Google or YouTube, or opens URLs. "
-                "- switch_browser_tab: switches to an open browser tab. "
-                "- type_text_into_active_window: types text into active window. "
-                "- press_keyboard_key: presses any keyboard key or shortcut. "
-                "- hold_keyboard_key: holds down a key for a duration in seconds (e.g. walking, sprinting, charging). "
-                "- move_game_character: moves a game character forward, backward, left, or right with optional sprinting. "
-                "- play_game_autonomously: when the user asks to advance dialogue, talk to an NPC, or play through a game sequence without micromanaging step-by-step. "
-                "- see_screen_and_act: captures the screen and visually locates and interacts with UI elements. "
-                "When the user asks to click, select, or interact with a visible element on screen, always call see_screen_and_act. "
-                "When the user asks to advance a dialogue sequence or talk to a character autonomously, call play_game_autonomously. "
-                "When the user asks to open or switch to an app, use open_or_switch_app with just the clean app name. "
-                "After calling a tool, reply in 1 concise, natural spoken sentence confirming the action. "
+                "You are an autonomous desktop voice assistant controlling a Windows PC.\n"
+                f"{learned_guidance}\n"
+                "Always use your tools to perform user requests:\n"
+                "- open_or_switch_app: opens or switches to an application or game like Discord, Steam, Spotify.\n"
+                "- search_or_open_website: searches Google or YouTube, or opens URLs. Only use when user explicitly asks to browse the web. NEVER open web search for food recipes or random queries when the user is playing a game.\n"
+                "- switch_browser_tab: switches to an open browser tab.\n"
+                "- type_text_into_active_window: types text into active window.\n"
+                "- press_keyboard_key: presses any keyboard key or shortcut.\n"
+                "- hold_keyboard_key: holds down a key for a duration in seconds (e.g. walking, sprinting, charging).\n"
+                "- move_game_character: moves a game character forward, backward, left, or right with optional sprinting.\n"
+                "- play_game_autonomously: when the user asks to advance dialogue, talk to an NPC, or play through a game sequence without micromanaging step-by-step.\n"
+                "- see_screen_and_act: captures the screen and visually locates and interacts with UI elements.\n"
+                "- research_game_controls_or_guide: when the user asks how to save, what key to press, how to exit, or when you are confused about how a game works, search the internet to find the exact key combinations.\n"
+                "When the user asks to click, select, or interact with a visible element on screen, always call see_screen_and_act.\n"
+                "When the user asks to advance a dialogue sequence or talk to a character autonomously, call play_game_autonomously.\n"
+                "When the user asks how to save, open system menu, or navigate game options, if unsure, call research_game_controls_or_guide.\n"
+                "When the user asks to open or switch to an app, use open_or_switch_app with just the clean app name.\n"
+                "After calling a tool, reply in 1 concise, natural spoken sentence confirming the action.\n"
                 "Never use markdown formatting, bullets, or symbols."
             ),
             markdown=False,

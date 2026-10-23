@@ -15,6 +15,7 @@ import pyautogui
 import pytweening
 
 from .snap import SnapVisualVerifier
+from .memory import global_memory
 
 logger = logging.getLogger("reflex.vision")
 
@@ -121,6 +122,9 @@ class VisionComputerUse:
         jpeg = _screen_to_jpeg_bytes(screen)
 
         prompt = _VISION_PROMPT.replace("{goal}", goal)
+        learned_ctx = global_memory.get_learned_prompt_context(goal)
+        if learned_ctx:
+            prompt += f"\n\n{learned_ctx}"
         client = self._get_client()
 
         logger.info("[Vision] Analyzing screen for goal: '%s'...", goal)
@@ -169,6 +173,7 @@ class VisionComputerUse:
             succeeded, prob, snap_ms = await self.verifier.verify_action_success(goal, post_jpeg)
             logger.info("[Snap Verifier] Outcome: %s (%.0f%% in %.0fms)", succeeded, prob * 100, snap_ms)
             print(f"  ⚡ [Snap Verifier] Verified outcome: {prob:.0%} in {snap_ms:.0f}ms", flush=True)
+            global_memory.record_action_outcome("active_app", goal, action_summary, succeeded)
 
         return action_summary
 

@@ -150,6 +150,12 @@ High-level gameplay sequences can run on autopilot without micro-dictation:
 * Dispatches multi-step sequences to advance dialogues, confirm modal dialogs (YES/NO), or interact with NPCs.
 * Stops autonomously when the objective is met or when a major narrative choice requires human input.
 
+### 8. Persistent Learning Memory & Autonomous Web Research
+The agent continuously learns across sessions and autonomously researches unknown game mechanics or controls:
+* Persistent Memory (`reflex_agent/data/learned_memory.json`): Records which actions succeed or fail, tracking proven controls and rules per game across runs.
+* Adaptive Action Pivoting: If an interaction key fails to produce a state change, the copilot automatically cycles to alternative interact keys (Enter, E, Space) instead of repeating failed keys.
+* Internet Game Research: When confused or asked how to save or perform an in-game action, the agent queries web guides via DuckDuckGo, synthesizes the exact PC keyboard sequence, and records the rule for future runs.
+
 ---
 
 ## Manual Installation & Usage

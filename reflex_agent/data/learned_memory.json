@@ -1,0 +1,50 @@
+{
+  "games": {
+    "persona 3 reload": {
+      "controls": {
+        "interact": [
+          "enter",
+          "e",
+          "space"
+        ],
+        "advance_dialogue": [
+          "space",
+          "enter"
+        ],
+        "menu": "tab",
+        "confirm": "enter",
+        "cancel": "esc",
+        "save": "tab -> system -> enter"
+      },
+      "successful_actions": {
+        "dialogue_advance": "space",
+        "menu_confirm": "enter",
+        "menu_open": "tab"
+      },
+      "failed_actions": {
+        "npc_interact_c": 5
+      },
+      "rules": [
+        "Press space to advance dialogue and text boxes.",
+        "To interact with NPCs or objects, try Enter or E if C does not trigger conversation.",
+        "To save: press Tab to open menu, navigate down to System, press Enter, select Save.",
+        "In confirmation prompts like Return to Title, use Enter to confirm, not mouse clicks.",
+        "To save your game in Persona 3 Reload on PC, press the [Esc] key to open the main menu during free-roam or dungeon exploration. Then, use your mouse or navigation keys to select the \"System\" option, and choose \"Save\" to record your progress."
+      ]
+    }
+  },
+  "stt_aliases": {
+    "recipes": "press c",
+    "recipe": "press c",
+    "bar": "space bar",
+    "breastfeed": "press space",
+    "breastpiece": "press space",
+    "piece": "space",
+    "peace": "space",
+    "sieve": "save",
+    "squeeze work": "space bar",
+    "squeeze bar": "space bar",
+    "space where": "space bar"
+  },
+  "history": []
+}
