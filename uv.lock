@@ -460,6 +460,7 @@ dependencies = [
     { name = "pillow", version = "12.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pillow", version = "13.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pyautogui" },
+    { name = "pydirectinput" },
     { name = "pytweening" },
     { name = "yapwrap", extra = ["all"] },
 ]
@@ -471,6 +472,7 @@ requires-dist = [
     { name = "mss", specifier = ">=9.0.0" },
     { name = "pillow", specifier = ">=10.0.0" },
     { name = "pyautogui", specifier = ">=0.9.54" },
+    { name = "pydirectinput", specifier = ">=1.0.4" },
     { name = "pytweening", specifier = ">=1.2.0" },
     { name = "yapwrap", extras = ["all"], specifier = ">=0.0.1a1" },
 ]
@@ -2344,6 +2346,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/05/ca/7817b4bf0c4b15c6a6ab8cdf4cb96c268335a8ca2f525de93b6ebe4c7d28/pydantic_settings-2.16.1.tar.gz", hash = "sha256:aff602a1886338c2df3d1e958e2193a8dc33cec75b91f202e83fd98484b4b0da", size = 303436, upload-time = "2026-10-20T11:37:19.024Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3c/74/fdf926afe145d8629c4b2ff57f4ea1d64ed7abc4d84d97463b2517a2547e/pydantic_settings-2.16.1-py3-none-any.whl", hash = "sha256:30f5313340da4e8f1b440d1910b92a5bc3ccbb6b4ba70ec2b8395bc921f418f5", size = 80771, upload-time = "2026-10-20T11:37:17.298Z" },
+]
+
+[[package]]
+name = "pydirectinput"
+version = "1.0.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5f/c0/cbcc5f1653d956ee2109b604747b7eaf37d59e50b41cc9dedabedf70aec6/PyDirectInput-1.0.4.tar.gz", hash = "sha256:bebe65102c69208688402f9f4cbd2ae7afc174fd2123e156e178b1304e7f80a2", size = 7486, upload-time = "2021-02-02T22:23:30.859Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c9/8e/f909defe798270afc2241d3a8986d51459e70c37f02d2ba549627b781b2c/PyDirectInput-1.0.4-py3-none-any.whl", hash = "sha256:238bbe97f505f9c8728a47ea6a787750dbe834ec1fb42b98b3d703d827eda83e", size = 8879, upload-time = "2021-02-02T22:23:28.115Z" },
 ]
 
 [[package]]

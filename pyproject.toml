@@ -17,6 +17,7 @@ dependencies = [
     "mss>=9.0.0",
     "agno>=3.1.5",
     "google-genai>=2.31.0",
+    "pydirectinput>=1.0.4",
 ]
 
 [tool.hatch.build.targets.wheel]

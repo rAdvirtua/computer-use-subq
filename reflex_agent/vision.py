@@ -124,7 +124,7 @@ class VisionComputerUse:
             response_mime_type="application/json",
         )
 
-        models = ["gemini-3-flash-preview", "gemini-3.5-flash-lite", "gemini-3.5-flash"]
+        models = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3-flash-preview"]
         data = None
         raw = ""
 
@@ -193,7 +193,8 @@ class VisionComputerUse:
             key = data.get("key", "enter").lower()
             logger.info("[Vision] Press key '%s': %s", key, reason)
             print(f"  ⌨️ [Vision Action] Pressing key '{key}' — {reason}", flush=True)
-            pyautogui.press(key)
+            from .desktop import press_key
+            press_key(key)
             return f"Pressed '{key}': {reason}"
 
         elif action == "type":
@@ -201,10 +202,8 @@ class VisionComputerUse:
             press_enter = data.get("press_enter", True)
             logger.info("[Vision] Typing '%s': %s", text, reason)
             print(f"  ⌨️ [Vision Action] Typing '{text}' — {reason}", flush=True)
-            pyautogui.write(text, interval=0.03)
-            if press_enter:
-                time.sleep(0.1)
-                pyautogui.press("enter")
+            from .desktop import type_text
+            type_text(text, press_enter=press_enter)
             return f"Typed '{text}': {reason}"
 
         elif action == "done":

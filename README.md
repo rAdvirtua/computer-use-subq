@@ -136,6 +136,12 @@ When an action requires spatial awareness (reading complex web layouts, targetin
 * Computes normalized coordinates `(x, y)` for the target visual element.
 * Moves the mouse with smooth easing and triggers native clicks.
 
+### 6. Universal DirectInput Keystrokes & DirectX Compatibility
+Video games (DirectX, Unreal Engine, Unity) and desktop software bypass standard Windows virtual message queues and poll hardware scan codes directly via DirectInput and RawInput:
+* Dispatches genuine hardware scan codes (`KEYEVENTF_SCANCODE`) via `pydirectinput`.
+* Enforces a minimum 60ms key-down hold duration across single keys and chord hotkeys.
+* Works seamlessly across modern games (e.g. Persona 3 Reload, Steam titles) and desktop apps without per-application profiles or configuration.
+
 ---
 
 ## Manual Installation & Usage

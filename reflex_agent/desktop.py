@@ -9,11 +9,14 @@ import time
 import urllib.parse
 from typing import List, Optional, Tuple
 
+import pydirectinput
 import pyautogui
 import pytweening
 
 pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0.15
+pydirectinput.FAILSAFE = False
+pydirectinput.PAUSE = 0.0
 
 logger = logging.getLogger("reflex.desktop")
 _user32 = ctypes.windll.user32
@@ -217,25 +220,60 @@ def scroll_screen(direction: str = "down", amount: int = 3) -> str:
     return f"Scrolled {direction}."
 
 
-def press_key(key: str) -> str:
+def press_key(key: str, hold_duration: float = 0.06) -> str:
     attach_to_input_desktop()
     clean_key = key.strip().lower()
     logger.info("Pressing key: %s", clean_key)
     if "+" in clean_key:
         keys = [k.strip() for k in clean_key.split("+")]
-        pyautogui.hotkey(*keys)
+        try:
+            for k in keys:
+                mapped = "escape" if k == "esc" else k
+                if mapped in pydirectinput.KEYBOARD_MAPPING:
+                    pydirectinput.keyDown(mapped)
+                else:
+                    pyautogui.keyDown(k)
+            time.sleep(hold_duration)
+            for k in reversed(keys):
+                mapped = "escape" if k == "esc" else k
+                if mapped in pydirectinput.KEYBOARD_MAPPING:
+                    pydirectinput.keyUp(mapped)
+                else:
+                    pyautogui.keyUp(k)
+        except Exception:
+            pyautogui.hotkey(*keys)
     else:
-        pyautogui.press(clean_key)
+        mapped = "escape" if clean_key == "esc" else clean_key
+        if mapped in pydirectinput.KEYBOARD_MAPPING:
+            try:
+                pydirectinput.keyDown(mapped)
+                time.sleep(hold_duration)
+                pydirectinput.keyUp(mapped)
+            except Exception:
+                pyautogui.press(clean_key)
+        else:
+            pyautogui.press(clean_key)
     return f"Pressed '{clean_key}'."
 
 
 def type_text(text: str, press_enter: bool = False) -> str:
     attach_to_input_desktop()
     logger.info("Typing text: %s", text)
-    pyautogui.write(text, interval=0.03)
+    for char in text:
+        char_lower = char.lower()
+        if char_lower in pydirectinput.KEYBOARD_MAPPING:
+            try:
+                pydirectinput.keyDown(char_lower)
+                time.sleep(0.02)
+                pydirectinput.keyUp(char_lower)
+            except Exception:
+                pyautogui.write(char)
+        else:
+            pyautogui.write(char)
+        time.sleep(0.02)
     if press_enter:
-        time.sleep(0.1)
-        pyautogui.press("enter")
+        time.sleep(0.08)
+        press_key("enter")
     return f"Typed '{text}'."
 
 
