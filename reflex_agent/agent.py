@@ -22,6 +22,7 @@ from yapwrap.core.base import BaseAgent
 from yapwrap.core.events import AgentEvent
 
 from .vision import VisionComputerUse
+from .game_copilot import AutonomousGameCopilot
 from .desktop import (
     focus_app_by_process,
     open_app_or_game,
@@ -29,6 +30,9 @@ from .desktop import (
     switch_browser_tab as desktop_switch_tab,
     scroll_screen,
     press_key,
+    hold_key,
+    repeat_key,
+    move_game,
     type_text,
 )
 
@@ -40,11 +44,56 @@ def _clean_spoken_text(text: str) -> str:
     cleaned = re.sub(r"[^\w\s]", "", cleaned)
     cleaned = re.sub(r"^(?:can you|could you|please|would you|just|hey|agent)?\s*", "", cleaned)
     cleaned = re.sub(r"\s*(?:please|for me|now|right now)?$", "", cleaned)
+    cleaned = re.sub(r"\b(?:piece|peace|breastpiece)\b", "space", cleaned)
+    cleaned = re.sub(r"\bsqueeze\s*(?:work|bar)?\b", "space bar", cleaned)
+    cleaned = re.sub(r"\bspace\s+where\b", "space bar", cleaned)
     return cleaned.strip()
 
 
 def _check_local_hardware_reflex(text: str) -> Optional[Tuple[str, str]]:
     c = _clean_spoken_text(text)
+    num_map = {
+        "once": 1,
+        "twice": 2,
+        "two": 2,
+        "three": 3,
+        "four": 4,
+        "five": 5,
+        "six": 6,
+        "seven": 7,
+        "eight": 8,
+        "nine": 9,
+        "ten": 10,
+    }
+
+    m_move = re.search(r"^(?:move|walk|run|sprint|go)\s+(forward|ahead|front|backward|back|left|right)(?:\s+(?:for\s+)?(\d+(?:\.\d+)?)\s*(?:s|sec|seconds)?)?$", c)
+    if m_move:
+        direction = m_move.group(1)
+        raw_sec = m_move.group(2)
+        duration = float(raw_sec) if raw_sec else 1.5
+        is_sprint = "sprint" in c or "run" in c
+        ack = move_game(direction, duration=duration, sprint=is_sprint)
+        return ("move_game", ack)
+
+    m_hold = re.search(r"^hold\s+(?:the\s+)?([a-z0-9]|space|shift\+[a-z])(?:\s+(?:key|button))?\s+(?:for\s+)?(\d+(?:\.\d+)?)\s*(?:s|sec|seconds)?$", c)
+    if m_hold:
+        key = m_hold.group(1)
+        raw_sec = m_hold.group(2)
+        duration = float(raw_sec) if raw_sec else 1.0
+        ack = hold_key(key, duration=duration)
+        return ("hold_key", ack)
+
+    m_key = re.search(r"^(?:press|hit|tap)\s+(?:the\s+)?([a-z0-9]|tab|enter|esc|escape|space|backspace|delete|shift|ctrl|alt)(?:\s+(?:key|button|bar))?(?:\s+(\d+|once|twice|two|three|four|five|six|seven|eight|nine|ten)\s+times?)?(?:\s+again)?$", c)
+    if m_key:
+        raw_key = m_key.group(1)
+        raw_count = m_key.group(2)
+        times = int(raw_count) if raw_count and raw_count.isdigit() else num_map.get(raw_count, 1)
+        if times > 1:
+            ack = repeat_key(raw_key, times=times)
+            return ("repeat_key", ack)
+        else:
+            ack = press_key(raw_key)
+            return ("press_key", ack)
 
     if any(k in c for k in ("space bar", "spacebar", "space", "pause", "unpause", "play", "resume", "freeze")):
         press_key("space")
@@ -112,12 +161,18 @@ class ReflexDesktopAgent(BaseAgent):
     def __init__(self, model_id: str = "gemini-3.5-flash-lite") -> None:
         api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         self.vision = VisionComputerUse(api_key=api_key)
+        self.game_copilot = AutonomousGameCopilot(api_key=api_key)
 
         vision_engine = self.vision
+        copilot_engine = self.game_copilot
 
         async def see_screen_and_act(instruction: str) -> str:
             """Visually look at the screen to find buttons, links, videos, cards, search bars, or UI elements, and interact with them using mouse and keyboard."""
             return await vision_engine.perceive_and_act(instruction)
+
+        async def play_game_autonomously(objective: str, max_steps: int = 5) -> str:
+            """Autonomously play through game sequences, advance dialogue/conversations, confirm prompts, navigate towards objectives, or interact with NPCs by reading on-screen key prompts."""
+            return await copilot_engine.run_game_loop(objective, max_steps=max_steps)
 
         def open_or_switch_app(app_name: str) -> str:
             """Open or switch to any application or game by name (e.g. Discord, Brave, Chrome, Spotify, Steam, Persona 3)."""
@@ -139,6 +194,14 @@ class ReflexDesktopAgent(BaseAgent):
             """Press any keyboard key or shortcut (e.g. enter, esc, tab, space, ctrl+w, backspace)."""
             return press_key(key)
 
+        def hold_keyboard_key(key: str, duration: float = 1.0) -> str:
+            """Hold down a key or combination (e.g. w, a, s, d, shift+w) for a given duration in seconds."""
+            return hold_key(key, duration=duration)
+
+        def move_game_character(direction: str = "forward", duration: float = 1.5, sprint: bool = False) -> str:
+            """Move a video game character in a direction (forward, backward, left, right) for a duration with optional sprinting."""
+            return move_game(direction, duration=duration, sprint=sprint)
+
         self.controller_agent = Agent(
             model=Gemini(id=model_id, api_key=api_key),
             tools=[
@@ -147,7 +210,10 @@ class ReflexDesktopAgent(BaseAgent):
                 switch_browser_tab,
                 type_text_into_active_window,
                 press_keyboard_key,
+                hold_keyboard_key,
+                move_game_character,
                 see_screen_and_act,
+                play_game_autonomously,
             ],
             instructions=(
                 "You are an autonomous desktop voice assistant controlling a Windows PC. "
@@ -157,8 +223,12 @@ class ReflexDesktopAgent(BaseAgent):
                 "- switch_browser_tab: switches to an open browser tab. "
                 "- type_text_into_active_window: types text into active window. "
                 "- press_keyboard_key: presses any keyboard key or shortcut. "
-                "- see_screen_and_act: captures the screen and visually locates and clicks buttons, links, videos, or UI elements. "
+                "- hold_keyboard_key: holds down a key for a duration in seconds (e.g. walking, sprinting, charging). "
+                "- move_game_character: moves a game character forward, backward, left, or right with optional sprinting. "
+                "- play_game_autonomously: when the user asks to advance dialogue, talk to an NPC, or play through a game sequence without micromanaging step-by-step. "
+                "- see_screen_and_act: captures the screen and visually locates and interacts with UI elements. "
                 "When the user asks to click, select, or interact with a visible element on screen, always call see_screen_and_act. "
+                "When the user asks to advance a dialogue sequence or talk to a character autonomously, call play_game_autonomously. "
                 "When the user asks to open or switch to an app, use open_or_switch_app with just the clean app name. "
                 "After calling a tool, reply in 1 concise, natural spoken sentence confirming the action. "
                 "Never use markdown formatting, bullets, or symbols."
@@ -207,3 +277,4 @@ class ReflexDesktopAgent(BaseAgent):
 
     async def close(self) -> None:
         await self.vision.close()
+        await self.game_copilot.close()

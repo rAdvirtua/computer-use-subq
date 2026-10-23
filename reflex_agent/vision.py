@@ -25,12 +25,21 @@ The screenshot shows the user's active screen.
 Coordinates are normalized from 0 to 1000 across width (X) and height (Y):
 - (0, 0) is top-left, (1000, 1000) is bottom-right, (500, 500) is center.
 
-Choose the single best action to execute the user's instruction:
+GAME & HUD INTELLIGENCE:
+- If a video game, 3D world, or game menu is visible:
+  * Check for on-screen prompt keys and button legends (e.g. "[C] Talk", "[SPACE] Advance/Skip", "[ENTER] Decide", "[ESC] Back", "[E] Interact", "[WASD] Move").
+  * In game dialogues, modal confirmation prompts (like "YES / NO"), and NPC interactions, DO NOT click with the mouse if an on-screen key prompt ([C], [SPACE], [ENTER]) or arrow navigation is indicated. Use "press_key" with that key instead.
+  * To confirm a highlighted selection (such as "YES", "OK", "CONFIRM"), use "press_key" with "enter", "space", or "c". If another option is selected, use "press_key" with "left" or "right" to toggle before confirming.
+  * To move the player character forward or toward an objective/door, use "hold_key" with key "w" (or "shift+w" to sprint) with duration between 1.0 and 3.0 seconds.
+
+Actions:
 1. "click": {"action": "click", "x": <int 0-1000>, "y": <int 0-1000>, "reason": "why clicking here"}
 2. "double_click": {"action": "double_click", "x": <int 0-1000>, "y": <int 0-1000>, "reason": "why double clicking"}
-3. "press_key": {"action": "press_key", "key": "enter|space|esc|tab|up|down|left|right|w|a|s|d", "reason": "why pressing key"}
-4. "type": {"action": "type", "text": "...", "press_enter": true, "reason": "what to type"}
-5. "done": {"action": "done", "reason": "goal is already accomplished"}
+3. "press_key": {"action": "press_key", "key": "enter|space|esc|tab|c|e|up|down|left|right|w|a|s|d", "reason": "why pressing key"}
+4. "hold_key": {"action": "hold_key", "key": "w|a|s|d|shift+w|space", "duration": <float 0.5-5.0>, "reason": "why holding key"}
+5. "repeat_key": {"action": "repeat_key", "key": "down|up|space|enter", "times": <int 1-10>, "reason": "why repeating key"}
+6. "type": {"action": "type", "text": "...", "press_enter": true, "reason": "what to type"}
+7. "done": {"action": "done", "reason": "goal is already accomplished"}
 
 Return ONLY a valid JSON object matching this schema."""
 
@@ -196,6 +205,24 @@ class VisionComputerUse:
             from .desktop import press_key
             press_key(key)
             return f"Pressed '{key}': {reason}"
+
+        elif action == "hold_key":
+            key = data.get("key", "w").lower()
+            duration = float(data.get("duration", 1.5))
+            logger.info("[Vision] Hold key '%s' for %.2fs: %s", key, duration, reason)
+            print(f"  ⌨️ [Vision Action] Holding key '{key}' for {duration:.1f}s — {reason}", flush=True)
+            from .desktop import hold_key
+            hold_key(key, duration=duration)
+            return f"Held '{key}' for {duration:.1f}s: {reason}"
+
+        elif action == "repeat_key":
+            key = data.get("key", "space").lower()
+            times = int(data.get("times", 1))
+            logger.info("[Vision] Repeat key '%s' %d times: %s", key, times, reason)
+            print(f"  ⌨️ [Vision Action] Repeating key '{key}' {times} times — {reason}", flush=True)
+            from .desktop import repeat_key
+            repeat_key(key, times=times)
+            return f"Pressed '{key}' {times} times: {reason}"
 
         elif action == "type":
             text = data.get("text", "")

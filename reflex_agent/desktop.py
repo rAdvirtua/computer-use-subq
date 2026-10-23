@@ -256,6 +256,49 @@ def press_key(key: str, hold_duration: float = 0.06) -> str:
     return f"Pressed '{clean_key}'."
 
 
+def hold_key(key: str, duration: float = 1.0) -> str:
+    attach_to_input_desktop()
+    clean_key = key.strip().lower()
+    clamped_duration = max(0.05, min(duration, 15.0))
+    logger.info("Holding key: %s for %.2fs", clean_key, clamped_duration)
+    press_key(clean_key, hold_duration=clamped_duration)
+    return f"Held '{clean_key}' for {clamped_duration:.1f}s."
+
+
+def repeat_key(key: str, times: int = 1, interval: float = 0.12) -> str:
+    attach_to_input_desktop()
+    clean_key = key.strip().lower()
+    count = max(1, min(times, 20))
+    logger.info("Repeating key: %s %d times", clean_key, count)
+    for i in range(count):
+        press_key(clean_key, hold_duration=0.07)
+        if i < count - 1:
+            time.sleep(interval)
+    return f"Pressed '{clean_key}' {count} times."
+
+
+def move_game(direction: str = "forward", duration: float = 1.5, sprint: bool = False) -> str:
+    attach_to_input_desktop()
+    clean_dir = direction.strip().lower()
+    dir_map = {
+        "forward": "w",
+        "front": "w",
+        "ahead": "w",
+        "up": "w",
+        "backward": "s",
+        "back": "s",
+        "reverse": "s",
+        "down": "s",
+        "left": "a",
+        "right": "d",
+    }
+    key = dir_map.get(clean_dir, "w")
+    target = f"shift+{key}" if sprint else key
+    hold_key(target, duration=duration)
+    mode = "Sprinted" if sprint else "Moved"
+    return f"{mode} {clean_dir} for {duration:.1f}s."
+
+
 def type_text(text: str, press_enter: bool = False) -> str:
     attach_to_input_desktop()
     logger.info("Typing text: %s", text)

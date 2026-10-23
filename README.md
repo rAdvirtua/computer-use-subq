@@ -136,11 +136,19 @@ When an action requires spatial awareness (reading complex web layouts, targetin
 * Computes normalized coordinates `(x, y)` for the target visual element.
 * Moves the mouse with smooth easing and triggers native clicks.
 
-### 6. Universal DirectInput Keystrokes & DirectX Compatibility
+### 6. Universal DirectInput Keystrokes & Press-and-Hold
 Video games (DirectX, Unreal Engine, Unity) and desktop software bypass standard Windows virtual message queues and poll hardware scan codes directly via DirectInput and RawInput:
 * Dispatches genuine hardware scan codes (`KEYEVENTF_SCANCODE`) via `pydirectinput`.
-* Enforces a minimum 60ms key-down hold duration across single keys and chord hotkeys.
-* Works seamlessly across modern games (e.g. Persona 3 Reload, Steam titles) and desktop apps without per-application profiles or configuration.
+* Press-and-hold duration support: moves game characters smoothly (e.g. `hold_key("w", 2.0)` or `move_game("forward", 1.5, sprint=True)`).
+* Key repeat support: handles requests like "press w four times" with calibrated inter-key intervals.
+* Zero-latency local reflex routing: single-key presses ("press w", "press c", "press tab") execute in <60ms directly in local memory.
+* Acoustic gaming STT normalizer: resolves background game audio confusions (e.g. "piece", "squeeze work" -> "space").
+
+### 7. Autonomous Game Copilot
+High-level gameplay sequences can run on autopilot without micro-dictation:
+* Inspects HUD and on-screen button prompt legends (`[C] Talk`, `[Space] Advance`, `[Enter] Decide`).
+* Dispatches multi-step sequences to advance dialogues, confirm modal dialogs (YES/NO), or interact with NPCs.
+* Stops autonomously when the objective is met or when a major narrative choice requires human input.
 
 ---
 
