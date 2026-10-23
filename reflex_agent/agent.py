@@ -38,45 +38,53 @@ logger = logging.getLogger("reflex.agent")
 def _clean_spoken_text(text: str) -> str:
     cleaned = text.lower().strip()
     cleaned = re.sub(r"[^\w\s]", "", cleaned)
-    cleaned = re.sub(r"^(?:can you|could you|please|would you)?\s*", "", cleaned)
-    cleaned = re.sub(r"\s*(?:please|for me|now)?$", "", cleaned)
+    cleaned = re.sub(r"^(?:can you|could you|please|would you|just|hey|agent)?\s*", "", cleaned)
+    cleaned = re.sub(r"\s*(?:please|for me|now|right now)?$", "", cleaned)
     return cleaned.strip()
 
 
 def _check_local_hardware_reflex(text: str) -> Optional[Tuple[str, str]]:
     c = _clean_spoken_text(text)
 
-    if c in ("pause", "play", "resume", "stop", "freeze", "pause the video", "play the video", "resume the video"):
+    if any(k in c for k in ("space bar", "spacebar", "space", "pause", "unpause", "play", "resume", "freeze")):
         press_key("space")
         return ("pause_resume", "Toggled playback.")
 
-    elif c in ("mute", "unmute", "silence", "quiet", "mute audio", "silence audio"):
+    elif any(k in c for k in ("mute", "unmute", "silence", "quiet")):
         press_key("m")
         return ("mute_toggle", "Toggled mute.")
 
-    elif c in ("volume up", "turn it up", "louder", "make it louder", "increase volume", "raise volume"):
+    elif ("volume" in c or "sound" in c or "audio" in c or "louder" in c) and any(k in c for k in ("up", "louder", "raise", "increase", "boost", "more")):
         press_key("volumeup")
         return ("volume_up", "Volume up.")
 
-    elif c in ("volume down", "turn it down", "softer", "quieter", "make it softer", "lower volume", "decrease volume"):
+    elif ("volume" in c or "sound" in c or "audio" in c or "quieter" in c or "softer" in c) and any(k in c for k in ("down", "quieter", "softer", "lower", "decrease", "reduce", "less")):
         press_key("volumedown")
         return ("volume_down", "Volume down.")
 
-    elif c in ("scroll down", "page down", "scroll down a bit", "scroll a bit down"):
-        scroll_screen("down")
-        return ("scroll_down", "Scrolled down.")
+    elif "scroll" in c or "page" in c:
+        if any(k in c for k in ("down", "bottom", "below")):
+            scroll_screen("down")
+            return ("scroll_down", "Scrolled down.")
+        elif any(k in c for k in ("up", "top", "above")):
+            scroll_screen("up")
+            return ("scroll_up", "Scrolled up.")
 
-    elif c in ("scroll up", "page up", "scroll up a bit", "scroll a bit up"):
-        scroll_screen("up")
-        return ("scroll_up", "Scrolled up.")
-
-    elif c in ("close tab", "close window", "close this", "close the tab", "close current tab"):
+    elif any(k in c for k in ("close", "kill", "exit")) and any(k in c for k in ("tab", "window", "this")):
         press_key("ctrl+w")
         return ("close_tab", "Closed tab.")
 
-    elif c in ("fullscreen", "full screen", "toggle fullscreen", "exit fullscreen"):
+    elif any(k in c for k in ("fullscreen", "full screen")):
         press_key("f")
         return ("fullscreen", "Toggled fullscreen.")
+
+    elif any(k in c for k in ("press enter", "hit enter")):
+        press_key("enter")
+        return ("enter", "Pressed enter.")
+
+    elif any(k in c for k in ("escape", "press esc")):
+        press_key("escape")
+        return ("escape", "Pressed escape.")
 
     return None
 
@@ -84,13 +92,13 @@ def _check_local_hardware_reflex(text: str) -> Optional[Tuple[str, str]]:
 def _check_local_app_or_tab_switch(text: str) -> Optional[str]:
     c = _clean_spoken_text(text)
 
-    m_tab = re.search(r"^(?:switch to|go to|open|show)\s+(?:the\s+)?(.+?)\s+tab$", c)
+    m_tab = re.search(r"^(?:switch to|go to|open up|open|show)\s+(?:the\s+)?(.+?)\s+tab$", c)
     if m_tab:
         target_tab = m_tab.group(1).strip()
         desktop_switch_tab(target_tab)
         return f"Switched to {target_tab} tab."
 
-    m_app = re.search(r"^(?:switch to|go to|bring up|focus)\s+(?:the\s+)?(?:app\s+)?(.+)$", c)
+    m_app = re.search(r"^(?:switch to|go to|bring up|focus|open up|open|launch|start)\s+(?:the\s+)?(?:app\s+)?(.+)$", c)
     if m_app:
         target_app = m_app.group(1).strip()
         if focus_app_by_process(target_app):
@@ -101,7 +109,7 @@ def _check_local_app_or_tab_switch(text: str) -> Optional[str]:
 
 class ReflexDesktopAgent(BaseAgent):
 
-    def __init__(self, model_id: str = "gemini-3-flash-preview") -> None:
+    def __init__(self, model_id: str = "gemini-3.5-flash-lite") -> None:
         api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         self.vision = VisionComputerUse(api_key=api_key)
 

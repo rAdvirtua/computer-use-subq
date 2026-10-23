@@ -43,7 +43,7 @@ async def main() -> None:
     print("\n" + "=" * 60)
     print("  Superhuman Voice Desktop Agent (SubQ Snap + Gemini Multimodal)")
     print("=" * 60)
-    model_name = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
+    model_name = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
     print(f"  Gemini Model   : {model_name}")
     print(f"  Deepgram STT   : {'OK' if os.environ.get('DEEPGRAM_API_KEY') else 'MISSING'}")
     print(f"  Cartesia TTS   : {'OK' if os.environ.get('CARTESIA_API_KEY') else 'MISSING'}")
