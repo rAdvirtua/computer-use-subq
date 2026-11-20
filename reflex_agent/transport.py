@@ -37,13 +37,13 @@ class EchoSafeLocalTransport(LocalTransport):
         try:
             import sounddevice as sd
         except ImportError as exc:
-            raise ImportError("EchoSafeLocalTransport requires `pip install 'yapwrap[local]'`.") from exc
+            raise ImportError("sounddevice required for LocalTransport.") from exc
 
         loop = asyncio.get_running_loop()
 
         def mic_callback(indata, frames, time_info, status):
             if status:
-                logger.debug("Microphone status: %s", status)
+                logger.debug("mic status: %s", status)
             data_bytes = bytes(indata)
             if self.is_playing:
                 data_bytes = b"\x00" * len(data_bytes)
@@ -51,14 +51,14 @@ class EchoSafeLocalTransport(LocalTransport):
 
         def speaker_callback(outdata, frames, time_info, status):
             if status:
-                logger.debug("Speaker status: %s", status)
+                logger.debug("speaker status: %s", status)
             outdata[:] = self._read_playback(frames * 2)
             loop.call_soon_threadsafe(self._space.set)
 
         options = dict(samplerate=self.sample_rate, blocksize=self.frame_bytes // 2, dtype="int16", channels=1)
         try:
             with sd.RawInputStream(callback=mic_callback, **options), sd.RawOutputStream(callback=speaker_callback, **options):
-                print("Session online. Start speaking (Ctrl+C to stop).", flush=True)
+                print("audio: online (ctrl+c to stop)", flush=True)
                 while self._is_open:
                     chunk = await self._input_queue.get()
                     if chunk is None:

@@ -5,11 +5,11 @@ import json
 import logging
 import os
 import time
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 
 from google.genai import types
 
-from .desktop import press_key, hold_key, repeat_key, move_game, attach_to_input_desktop
+from .desktop import press_key, hold_key
 from .snap import SnapVisualVerifier
 from .vision import capture_screen, _screen_to_jpeg_bytes, _extract_json
 from .memory import global_memory
@@ -24,26 +24,23 @@ Recent Actions: {history}
 
 {learned_context}
 
-The screenshot shows the current active game screen.
-Inspect the game HUD, on-screen key legends, prompts, and current state:
-1. State: Dialogue sequence, modal prompt (YES/NO), menu, exploration/walking, or cutscene?
-2. Button Prompts: Look for on-screen prompt keys (e.g. "[C] Talk", "[SPACE] Advance/Skip", "[ENTER] Decide", "[ESC] Back", "[E] Interact", "[WASD] Move").
-3. Determine the next step towards the objective:
-   - "advance_dialogue": dialogue box with text or arrow -> press space or enter.
-   - "confirm_choice": modal prompt (e.g. YES/NO) -> press enter or space to confirm, or arrow to switch.
-   - "interact": interact icon on screen -> press enter, e, or c.
-   - "move": player character is moving -> hold 'w' (or 'a'/'s'/'d' or 'shift+w') towards target for 1.0 to 2.5s.
-   - "press_key": press a single game key (space, enter, esc, c, tab, etc.).
-   - "research": if stuck, unsure of controls, or previous actions failed repeatedly -> trigger research.
-   - "done": objective is accomplished, or human decision is required.
+Inspect the game screen, HUD, key legends, and current state.
+Actions:
+- "advance_dialogue": dialogue box with text or arrow -> press space or enter.
+- "confirm_choice": modal prompt -> press enter or space.
+- "interact": interact icon -> press enter, e, or c.
+- "move": hold 'w' (or 'a'/'s'/'d') towards target for duration.
+- "press_key": press a single key.
+- "research": if stuck -> trigger research.
+- "done": objective is accomplished.
 
 Return ONLY a JSON object:
 {{
-  "state": "<concise description of screen>",
+  "state": "<screen description>",
   "action": "advance_dialogue | confirm_choice | interact | move | press_key | research | done",
-  "key": "<key to press, e.g. space, c, enter, e, w, left, right, esc>",
-  "duration": <float seconds if moving or holding, default 0.0>,
-  "reason": "<why this action helps the objective>",
+  "key": "<key to press>",
+  "duration": <float seconds>,
+  "reason": "<reason>",
   "is_complete": <true or false>
 }}"""
 
@@ -68,15 +65,14 @@ class AutonomousGameCopilot:
         prev_key = ""
         stuck_count = 0
 
-        logger.info("[Game Copilot] Starting autonomous loop for: '%s' (max %d steps)", objective, max_steps)
-        print(f"\n🎮 [Game Copilot] Autopilot active for: '{objective}' (up to {max_steps} steps)", flush=True)
+        print(f"[copilot] active for: '{objective}' (max {max_steps} steps)", flush=True)
 
         learned_ctx = global_memory.get_learned_prompt_context(objective)
 
         for step in range(1, max_steps + 1):
             screen = capture_screen()
             if screen is None:
-                return "Could not capture game screen."
+                return "Could not capture screen."
 
             jpeg = _screen_to_jpeg_bytes(screen, max_dim=1280, quality=75)
             prompt = _GAME_COPILOT_PROMPT.format(
@@ -109,14 +105,12 @@ class AutonomousGameCopilot:
                     break
                 except Exception as exc:
                     err_s = str(exc)
-                    logger.warning("[Game Copilot] Model %s failed: %s", m, err_s)
                     if "429" in err_s or "RESOURCE_EXHAUSTED" in err_s:
                         await asyncio.sleep(2.0)
                         continue
                     break
 
             if not data:
-                logger.warning("[Game Copilot] Could not parse model decision on step %d", step)
                 break
 
             state = data.get("state", "in-game")
@@ -138,14 +132,11 @@ class AutonomousGameCopilot:
                 alternates = ["enter", "e", "space"]
                 alt_idx = (stuck_count - 1) % len(alternates)
                 key = alternates[alt_idx]
-                print(f"  ⚡ [Adaptive Learning] Key '{raw_key}' had no effect. Trying '{key}'!", flush=True)
 
-            print(f"  🕹️ [Step {step}/{max_steps}] State: {state}", flush=True)
-            print(f"     Action: {action} ({key}) — {reason}", flush=True)
+            print(f"[copilot] step {step}/{max_steps}: {action} ({key})", flush=True)
 
             if action == "research" or stuck_count >= 3:
                 guide = await research_game_knowledge(objective, "Persona 3 Reload")
-                print(f"  🧠 [Game Research Insight] {guide}", flush=True)
                 history.append(f"Researched: {guide[:60]}")
                 stuck_count = 0
                 await asyncio.sleep(1.0)

@@ -194,19 +194,19 @@ _SYSTEM_PROMPT = (
     "You are an autonomous desktop voice assistant controlling a Windows PC.\n"
     "{learned_guidance}\n"
     "Always use your tools to perform user requests:\n"
-    "- show_desktop: minimizes all windows and shows the desktop. Call this when user wants to go to desktop or see desktop icons.\n"
-    "- open_or_switch_app: opens or switches to an application or game like Discord, Steam, Spotify.\n"
-    "- search_or_open_website: searches Google or YouTube, or opens URLs. Only use when user explicitly asks to browse the web.\n"
+    "- show_desktop: minimizes all windows and shows the desktop.\n"
+    "- open_or_switch_app: opens or switches to an application or game.\n"
+    "- search_or_open_website: searches Google or YouTube, or opens URLs.\n"
     "- switch_browser_tab: switches to an open browser tab.\n"
     "- type_text_into_active_window: types text into active window.\n"
-    "- press_keyboard_key: presses any keyboard key or shortcut (e.g. enter, esc, space, win+d).\n"
-    "- hold_keyboard_key: holds down a key for a duration in seconds (e.g. walking, sprinting, charging).\n"
-    "- move_game_character: moves a game character forward, backward, left, or right with optional sprinting.\n"
+    "- press_keyboard_key: presses any keyboard key or shortcut.\n"
+    "- hold_keyboard_key: holds down a key for a duration in seconds.\n"
+    "- move_game_character: moves a game character with optional sprinting.\n"
     "- play_game_autonomously: when the user asks to advance dialogue, talk to an NPC, or play through a game sequence.\n"
-    "- see_screen_and_act: captures the screen and visually locates and interacts with UI elements (like desktop icons or buttons).\n"
+    "- see_screen_and_act: captures the screen and visually locates and interacts with UI elements.\n"
     "- research_game_controls_or_guide: searches the internet for game controls or guides.\n"
     "When the user asks to click, double click, or find an icon on the desktop or screen, call see_screen_and_act.\n"
-    "If the desktop is not currently visible, you can first call show_desktop or press_keyboard_key('win+d') before see_screen_and_act.\n"
+    "If the desktop is not currently visible, call show_desktop before see_screen_and_act.\n"
     "After calling a tool, reply in 1 concise, natural spoken sentence confirming the action.\n"
     "Never use markdown formatting, bullets, or symbols."
 )
@@ -229,7 +229,6 @@ def _check_local_hardware_reflex(text: str) -> Optional[Tuple[str, str]]:
         "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
     }
 
-    # Desktop navigation reflexes
     if any(k in c for k in ("go to desktop", "go to my desktop", "show desktop", "minimize all", "back to desktop", "switch to desktop", "open desktop")):
         press_key("win+d")
         return ("show_desktop", "Showed desktop.")
@@ -355,7 +354,6 @@ class ReflexDesktopAgent(BaseAgent):
             system_prompt = _SYSTEM_PROMPT.format(learned_guidance=learned_guidance)
             self._subq_client.push_system_message(system_prompt)
             self._subq_available = True
-            logger.info("[Agent] SubQ Savant client initialized (subq-savant-1.4)")
 
         if gemini_key:
             from agno.agent import Agent
@@ -430,14 +428,10 @@ class ReflexDesktopAgent(BaseAgent):
     def _select_backend(self) -> str:
         if self.backend != "auto":
             return self._active_backend
-
-        # SubQ Savant is 100% the primary model for everything
         if self._subq_available and self._subq_failures < 3:
             return "subq"
-
         if self._gemini_available:
             return "gemini"
-
         return self._active_backend
 
     async def _execute_tool(self, name: str, args: dict) -> str:
@@ -484,19 +478,19 @@ class ReflexDesktopAgent(BaseAgent):
         if reflex:
             action, ack = reflex
             total_ms = (time.perf_counter() - t0) * 1000
-            print(f"\n  ⚡ [Local Reflex] {action} -> Done in {total_ms:.1f}ms\n  ✅ {ack}", flush=True)
+            print(f"[reflex] {action} ({total_ms:.1f}ms): {ack}", flush=True)
             yield AgentEvent.text(ack)
             return
 
         app_switch_ack = _check_local_app_or_tab_switch(text)
         if app_switch_ack:
             total_ms = (time.perf_counter() - t0) * 1000
-            print(f"\n  ⚡ [Process Radar] {app_switch_ack} -> Done in {total_ms:.1f}ms", flush=True)
+            print(f"[radar] {app_switch_ack} ({total_ms:.1f}ms)", flush=True)
             yield AgentEvent.text(app_switch_ack)
             return
 
         backend = self._select_backend()
-        print(f"\n  🧠 [SubQ Controller] Reasoning on: '{text}'...", flush=True)
+        print(f"[controller] {text}", flush=True)
 
         if backend == "subq" and self._subq_client:
             try:
@@ -507,7 +501,7 @@ class ReflexDesktopAgent(BaseAgent):
                     max_rounds=5,
                 )
                 total_ms = (time.perf_counter() - t0) * 1000
-                print(f"  ⚡ [SubQ Savant] Done in {total_ms:.0f}ms: {response_text[:120]}", flush=True)
+                print(f"[subq] {response_text[:120]} ({total_ms:.0f}ms)", flush=True)
                 self._subq_failures = 0
                 yield AgentEvent.text(response_text)
                 return
@@ -515,16 +509,15 @@ class ReflexDesktopAgent(BaseAgent):
             except Exception as exc:
                 self._subq_failures += 1
                 err_str = str(exc)
-                logger.warning("[Agent] SubQ error (%d/3): %s", self._subq_failures, err_str)
-                print(f"  ⚠️ [SubQ Savant] Error, falling back to Gemini: {err_str[:80]}", flush=True)
+                logger.warning("[subq] error (%d/3): %s", self._subq_failures, err_str)
 
                 if self._gemini_available and self._gemini_agent:
                     backend = "gemini"
                 else:
                     if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                        yield AgentEvent.text("I'm hitting a quick API quota limit, please give me a few seconds.")
+                        yield AgentEvent.text("Rate limit reached. Please wait a moment.")
                     else:
-                        yield AgentEvent.text("Sorry, I had a momentary connection hiccup.")
+                        yield AgentEvent.text("Connection error occurred.")
                     return
 
         if backend == "gemini" and self._gemini_agent:
@@ -541,11 +534,11 @@ class ReflexDesktopAgent(BaseAgent):
             except Exception as exc:
                 self._gemini_failures += 1
                 err_str = str(exc)
-                logger.warning("[Agent] Gemini error: %s", err_str)
-                yield AgentEvent.text("Sorry, I had a momentary connection hiccup.")
+                logger.warning("[gemini] error: %s", err_str)
+                yield AgentEvent.text("Connection error occurred.")
                 return
 
-        yield AgentEvent.text("No AI backend is available. Please check your API keys.")
+        yield AgentEvent.text("No backend available.")
 
     def get_status(self) -> dict:
         return {

@@ -54,14 +54,6 @@ class ResilientDeepgramSTT(DeepgramSTT):
         audio_chunks: List[bytes] = []
         is_buffering = True
 
-        async def capture_first_chunks():
-            nonlocal is_buffering
-            async for chunk in audio:
-                if is_buffering:
-                    audio_chunks.append(chunk)
-                else:
-                    yield chunk
-
         for attempt in range(self.max_retries + 1):
             try:
                 async with connect(
@@ -88,7 +80,7 @@ class ResilientDeepgramSTT(DeepgramSTT):
                         async for message in ws:
                             data = json.loads(message)
                             if data.get("type") == "Error":
-                                logger.warning("[STT] Deepgram error message: %s", data.get("description"))
+                                logger.warning("[stt] deepgram error: %s", data.get("description"))
                                 break
                             channel = data.get("channel", {})
                             alternatives = channel.get("alternatives", [])
@@ -109,19 +101,14 @@ class ResilientDeepgramSTT(DeepgramSTT):
                 return
 
             except (TimeoutError, asyncio.CancelledError, OSError) as exc:
-                logger.warning(
-                    "[STT] Deepgram WebSocket handshake failed (attempt %d/%d): %s",
-                    attempt + 1,
-                    self.max_retries + 1,
-                    exc,
-                )
+                logger.warning("[stt] websocket handshake timeout (attempt %d/%d): %s", attempt + 1, self.max_retries + 1, exc)
                 if attempt < self.max_retries:
                     await asyncio.sleep(0.5)
                     continue
                 else:
-                    print(f"\n  ⚠️ [STT Warning] Voice network lag ({exc}). Ready for next command.", flush=True)
+                    print(f"[stt] timeout ({exc})", flush=True)
                     return
             except Exception as exc:
-                logger.error("[STT] Unexpected error in transcribe: %s", exc)
-                print(f"\n  ⚠️ [STT Warning] Voice audio blip: {exc}", flush=True)
+                logger.error("[stt] error: %s", exc)
+                print(f"[stt] error: {exc}", flush=True)
                 return

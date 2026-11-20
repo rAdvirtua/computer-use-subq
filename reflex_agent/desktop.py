@@ -340,7 +340,6 @@ def type_text(text: str, press_enter: bool = False) -> str:
     attach_to_input_desktop()
     logger.info("Typing text: %s", text[:60])
 
-    # Fast clipboard paste for long or formatted text (>12 chars)
     if len(text) > 12:
         if _set_clipboard_text(text):
             time.sleep(0.04)
@@ -350,7 +349,6 @@ def type_text(text: str, press_enter: bool = False) -> str:
                 press_key("enter")
             return f"Typed '{text}'."
 
-    # Direct typing fallback for short phrases
     for char in text:
         char_lower = char.lower()
         if char_lower in pydirectinput.KEYBOARD_MAPPING:

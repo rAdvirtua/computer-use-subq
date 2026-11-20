@@ -5,7 +5,7 @@ import json
 import logging
 import os
 import time
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -15,10 +15,6 @@ _BASE_URL = "https://api.subq.ai/v1"
 _DEFAULT_MODEL = "subq-savant-1.4"
 _MAX_RETRIES = 2
 _TIMEOUT = 30.0
-
-
-def _build_openai_tools(tool_defs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    return tool_defs
 
 
 class SubQSavantClient:
@@ -95,7 +91,6 @@ class SubQSavantClient:
         self,
         messages: Optional[List[Dict[str, Any]]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
-        use_history: bool = True,
     ) -> Dict[str, Any]:
         client = self._get_client()
         msgs = messages if messages is not None else list(self._conversation_history)
@@ -116,7 +111,7 @@ class SubQSavantClient:
 
                 if resp.status_code == 429:
                     wait = min(2 ** attempt, 8)
-                    logger.warning("[SubQ] Rate limited (429), retrying in %ds...", wait)
+                    logger.warning("[subq] rate limited (429), retry in %ds", wait)
                     await asyncio.sleep(wait)
                     continue
 
@@ -129,18 +124,18 @@ class SubQSavantClient:
                 last_error = exc
                 if exc.response.status_code >= 500:
                     wait = min(2 ** attempt, 8)
-                    logger.warning("[SubQ] Server error %d, retrying in %ds...", exc.response.status_code, wait)
+                    logger.warning("[subq] server error %d, retry in %ds", exc.response.status_code, wait)
                     await asyncio.sleep(wait)
                     continue
                 raise
             except (httpx.ConnectError, httpx.ReadTimeout) as exc:
                 last_error = exc
                 wait = min(2 ** attempt, 8)
-                logger.warning("[SubQ] Connection error: %s, retrying in %ds...", exc, wait)
+                logger.warning("[subq] connect error, retry in %ds", wait)
                 await asyncio.sleep(wait)
                 continue
 
-        raise last_error or RuntimeError("SubQ request failed after retries")
+        raise last_error or RuntimeError("subq request failed after retries")
 
     async def run_tool_loop(
         self,
@@ -151,7 +146,7 @@ class SubQSavantClient:
     ) -> str:
         self.push_user_message(user_input)
 
-        for round_num in range(max_rounds):
+        for _ in range(max_rounds):
             result = await self.chat_completion(
                 messages=list(self._conversation_history),
                 tools=tools_openai,
@@ -159,7 +154,6 @@ class SubQSavantClient:
             latency = result.get("_latency_ms", 0)
             choice = result["choices"][0]
             message = choice["message"]
-            finish = choice.get("finish_reason", "stop")
 
             if message.get("tool_calls"):
                 self._conversation_history.append(message)
@@ -172,8 +166,8 @@ class SubQSavantClient:
                     except json.JSONDecodeError:
                         fn_args = {}
 
-                    logger.info("[SubQ] Tool call: %s(%s) in %.0fms", fn_name, fn_args, latency)
-                    print(f"  🔧 [SubQ Savant] Calling {fn_name}({fn_args}) [{latency:.0f}ms]", flush=True)
+                    logger.info("[subq] tool: %s(%s) (%.0fms)", fn_name, fn_args, latency)
+                    print(f"[tool] {fn_name}({fn_args}) ({latency:.0f}ms)", flush=True)
 
                     try:
                         tool_result = await tool_executor(fn_name, fn_args)
@@ -189,7 +183,7 @@ class SubQSavantClient:
                 self.push_assistant_message(content)
             return content or "Done."
 
-        return "Completed action sequence."
+        return "Completed."
 
     async def close(self) -> None:
         if self._client is not None and not self._client.is_closed:

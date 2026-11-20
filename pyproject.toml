@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "computer-use-subq"
 version = "0.1.0"
-description = "Universal Autonomous Desktop Voice Agent using SubQ Snap Reflex and Gemini Multimodal Computer Use"
+description = "Voice-controlled desktop automation agent using Subquadratic models"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
