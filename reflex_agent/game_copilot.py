@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
 import time
 from typing import Optional, List
 
-from google.genai import types
+import httpx
 
 from .desktop import press_key, hold_key
 from .snap import SnapVisualVerifier
@@ -48,18 +49,28 @@ Return ONLY a JSON object:
 class AutonomousGameCopilot:
 
     def __init__(self, api_key: Optional[str] = None) -> None:
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        self._client = None
+        self.subq_key = os.environ.get("SUBQ_API_KEY", "")
+        self.gemini_key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        self._http_client: Optional[httpx.AsyncClient] = None
+        self._gemini_client = None
         self.verifier = SnapVisualVerifier()
 
-    def _get_client(self):
-        if self._client is None:
+    def _get_http_client(self) -> httpx.AsyncClient:
+        if self._http_client is None or self._http_client.is_closed:
+            self._http_client = httpx.AsyncClient(
+                headers={"Authorization": f"Bearer {self.subq_key}"},
+                timeout=30.0,
+                limits=httpx.Limits(max_keepalive_connections=5, keepalive_expiry=120.0),
+            )
+        return self._http_client
+
+    def _get_gemini_client(self):
+        if self._gemini_client is None and self.gemini_key:
             from google import genai
-            self._client = genai.Client(api_key=self.api_key)
-        return self._client
+            self._gemini_client = genai.Client(api_key=self.gemini_key)
+        return self._gemini_client
 
     async def run_game_loop(self, objective: str, max_steps: int = 8) -> str:
-        client = self._get_client()
         history: List[str] = []
         last_state = ""
         prev_key = ""
@@ -75,6 +86,8 @@ class AutonomousGameCopilot:
                 return "Could not capture screen."
 
             jpeg = _screen_to_jpeg_bytes(screen, max_dim=1280, quality=75)
+            b64_img = base64.b64encode(jpeg).decode("ascii")
+
             prompt = _GAME_COPILOT_PROMPT.format(
                 objective=objective,
                 step_num=step,
@@ -83,32 +96,56 @@ class AutonomousGameCopilot:
                 learned_context=learned_ctx,
             )
 
-            config = types.GenerateContentConfig(
-                temperature=0.1,
-                max_output_tokens=600,
-                response_mime_type="application/json",
-            )
-
             data = None
-            for m in ("gemini-3.5-flash-lite", "gemini-3.8-flash"):
+
+            if self.subq_key:
                 try:
-                    resp = await asyncio.to_thread(
-                        client.models.generate_content,
-                        model=m,
-                        contents=[
-                            types.Part.from_bytes(data=jpeg, mime_type="image/jpeg"),
-                            prompt,
-                        ],
-                        config=config,
+                    client = self._get_http_client()
+                    resp = await client.post(
+                        "https://api.subq.ai/v1/chat/completions",
+                        json={
+                            "model": "subq-savant-1.4",
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "text", "text": prompt},
+                                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}},
+                                    ],
+                                }
+                            ],
+                        },
                     )
-                    data = _extract_json(resp.text)
-                    break
+                    if resp.status_code == 200:
+                        raw = resp.json()["choices"][0]["message"].get("content", "").strip()
+                        data = _extract_json(raw)
                 except Exception as exc:
-                    err_s = str(exc)
-                    if "429" in err_s or "RESOURCE_EXHAUSTED" in err_s:
-                        await asyncio.sleep(2.0)
-                        continue
-                    break
+                    logger.warning("[copilot] subq call failed: %s", exc)
+
+            if not data and self.gemini_key:
+                g_client = self._get_gemini_client()
+                if g_client:
+                    from google.genai import types
+                    config = types.GenerateContentConfig(
+                        temperature=0.1,
+                        max_output_tokens=600,
+                        response_mime_type="application/json",
+                    )
+                    for m in ("gemini-3.5-flash-lite", "gemini-3.8-flash"):
+                        try:
+                            resp = await asyncio.to_thread(
+                                g_client.models.generate_content,
+                                model=m,
+                                contents=[
+                                    types.Part.from_bytes(data=jpeg, mime_type="image/jpeg"),
+                                    prompt,
+                                ],
+                                config=config,
+                            )
+                            data = _extract_json(resp.text)
+                            break
+                        except Exception:
+                            break
 
             if not data:
                 break
@@ -181,3 +218,6 @@ class AutonomousGameCopilot:
 
     async def close(self) -> None:
         await self.verifier.close()
+        if self._http_client and not self._http_client.is_closed:
+            await self._http_client.aclose()
+            self._http_client = None
