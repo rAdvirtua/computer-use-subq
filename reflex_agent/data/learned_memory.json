@@ -45,7 +45,8 @@
         "Look at the screen and see what option or prompt needs to be selected to do it again.": "Pressed 'c': Press 'C' key to check the Men's Room as prompted on the screen.",
         "Look at the game screen to locate the Heo vending machine or surrounding path, and move the character towards it.": "Held 'w' for 2.0s: Move the character forward towards the vending machine area.",
         "Look at the screen to see what is happening.": "Held 'w' for 2.0s: Move the character forward down the hallway towards the objective",
-        "Click on save slot two or option two on the screen.": "Clicked at (376, 625): Click on 'Two' message/option in the chat list as requested to click option two."
+        "Click on save slot two or option two on the screen.": "Clicked at (376, 625): Click on 'Two' message/option in the chat list as requested to click option two.",
+        "Look at the Discord screen in the active channel and read the recent conversation \u2014 do not click anything, just report what the latest messages say so I can craft a reply.": "Goal completed: Read-only task \u2014 no clicks needed. Latest messages in #new-senera (Yakuza Games server, ~6:40\u20136:47 pm), oldest to newest: iskrzak: 'ok ok okok' \u00b7 MeGoodGuy (replying to iskrzak): 'Salsa frontier' \u00b7 Mirrelle (replying to Mayor Adam East re Vox Solaris): 'you get the segment from going to mars' \u00b7 Mayor Adam East: 'Should be quick' \u00b7 Mirrelle: 'its a few missions on earth and you need to go to mars eventually anyway' \u00b7 hrid: 'hello' \u00b7 Mayor Adam East: 'Greetings' \u00b7 Mayor Adam East (replying to Mirrelle): 'Do I need Venus finished first' \u00b7 hrid: 'hey! greetings to you too, how's it going?' \u00b7 Mayor Adam East: 'Could be worse' \u00b7 Mirrelle: 'if you go to earth and check mars junction' \u00b7 Mayor Adam East: 'What about you'. The thread is mostly hrid greeting the channel and Mayor Adam East asking Warframe progression questions (Vox Solaris / Mars junction), answered by Mirrelle."
       },
       "failed_actions": {
         "Look at the screen to check the character's surroundings and steer away from the wall._Held 'a' for 1.0s: Steer the character away from the wall to the left": 1,
@@ -57,7 +58,13 @@
         "Move the mouse cursor towards the right side of the screen_Clicked at (1536, 540): Move the mouse cursor towards the right side of the screen as requested": 1,
         "Move the mouse cursor towards the left side of the screen._Clicked at (384, 540): Move the mouse cursor towards the left side of the screen as requested by the user.": 1,
         "Type hello in the message box_Clicked at (816, 1038): Click inside the message input box to focus it before typing.": 1,
-        "Find the Persona 4 Golden icon on the desktop and double click it to open the game._Pressed 'esc': Dismiss or minimize the terminal / prompt to view the desktop where the Persona 4 Golden icon is located.": 1
+        "Find the Persona 4 Golden icon on the desktop and double click it to open the game._Pressed 'esc': Dismiss or minimize the terminal / prompt to view the desktop where the Persona 4 Golden icon is located.": 1,
+        "Find the desktop icon or shortcut labeled Persona 4 Golden and double-click it to open the app._Clicked at (347, 129): Double-clicking the desktop shortcut labeled 'Persona 4 Golden' (Steam icon, top row) to launch the app": 1,
+        "On YouTube, locate the sidebar (left column) of recommended videos and click the third video from the top in that list._Clicked at (1056, 62): Focus the address bar \u2014 the current YouTube search page is blank, so no sidebar is visible to click": 1,
+        "Find the video grid on the YouTube page and click the third video thumbnail, counting left to right, top row first._Clicked at (695, 858): Clicking the third video thumbnail ('My virginity defense ft. Quickshell...') in the YouTube video feed.": 1,
+        "Find the desktop icon or shortcut labeled Super Hexagon and double-click it to launch the app._Clicked at (414, 342): Double-clicking the 'Super Hexagon' desktop shortcut (hexagon icon labeled Super Hexagon) to launch the app": 1,
+        "Look at the Discord left sidebar (server list) and find an orange colored server icon, then click on it._Clicked at (40, 829): Clicking the orange server icon at the bottom of Discord's server list sidebar": 1,
+        "Look at the Discord screen, find the message where someone said \"greetings\", and click on that channel or conversation so it's active for replying._Clicked at (149, 658): The message 'Greetings' from Mayor Adam East is in the #new-serna channel; clicking that channel in the sidebar ensures it is the active conversation for replying.": 1
       },
       "rules": []
     }

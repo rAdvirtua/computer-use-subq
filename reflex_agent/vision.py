@@ -241,7 +241,9 @@ class VisionComputerUse:
             time.sleep(0.1)
 
             if action == "double_click":
-                pyautogui.doubleClick()
+                pyautogui.click()
+                time.sleep(0.08)
+                pyautogui.click()
             else:
                 pyautogui.mouseDown()
                 time.sleep(0.05)

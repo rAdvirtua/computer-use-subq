@@ -14,7 +14,7 @@ import pyautogui
 import pytweening
 
 pyautogui.FAILSAFE = False
-pyautogui.PAUSE = 0.15
+pyautogui.PAUSE = 0.05
 pydirectinput.FAILSAFE = False
 pydirectinput.PAUSE = 0.0
 
@@ -93,60 +93,54 @@ def get_open_process_windows() -> List[Tuple[int, str, str]]:
     return results
 
 
-def focus_window_hwnd(hwnd: int) -> bool:
-    attach_to_input_desktop()
-    if not _user32.IsWindow(hwnd):
-        return False
+def focus_app_by_process(app_name: str) -> bool:
+    clean = app_name.lower().strip()
+    target_exes = APP_ALIASES.get(clean, [f"{clean}.exe", clean])
 
-    if _user32.IsIconic(hwnd):
-        _user32.ShowWindow(hwnd, 9)
-    else:
-        _user32.ShowWindow(hwnd, 5)
+    windows = get_open_process_windows()
+    for hwnd, exe, title in windows:
+        for target in target_exes:
+            if target == exe or (len(target) > 3 and target in exe):
+                logger.info("Found matching process: %s (PID/HWND %d)", exe, hwnd)
+                _user32.ShowWindow(hwnd, 9)
+                _user32.SetForegroundWindow(hwnd)
+                time.sleep(0.05)
+                return True
 
-    _user32.keybd_event(0x12, 0, 0, 0)
-    _user32.SetForegroundWindow(hwnd)
-    _user32.keybd_event(0x12, 0, 2, 0)
-    time.sleep(0.08)
-    return True
-
-
-def focus_app_by_process(query: str) -> bool:
-    clean = query.lower().strip()
-    target_exes = APP_ALIASES.get(clean, [clean + ".exe" if not clean.endswith(".exe") else clean])
-
-    proc_windows = get_open_process_windows()
-
-    for hwnd, exe, _ in proc_windows:
-        if exe in target_exes:
-            return focus_window_hwnd(hwnd)
-
-    for hwnd, exe, title in proc_windows:
-        if clean in exe or clean in title.lower():
-            return focus_window_hwnd(hwnd)
+    for hwnd, exe, title in windows:
+        t_clean = title.lower()
+        if clean in t_clean:
+            logger.info("Found matching title: '%s' (%s)", title, exe)
+            _user32.ShowWindow(hwnd, 9)
+            _user32.SetForegroundWindow(hwnd)
+            time.sleep(0.05)
+            return True
 
     return False
 
 
 def focus_browser() -> bool:
-    proc_windows = get_open_process_windows()
-    browser_exes = {"brave.exe", "chrome.exe", "msedge.exe", "firefox.exe", "opera.exe"}
-    for hwnd, exe, _ in proc_windows:
+    browser_exes = APP_ALIASES["browser"]
+    for hwnd, exe, _ in get_open_process_windows():
         if exe in browser_exes:
-            return focus_window_hwnd(hwnd)
+            _user32.ShowWindow(hwnd, 9)
+            _user32.SetForegroundWindow(hwnd)
+            time.sleep(0.05)
+            return True
     return False
 
 
 def switch_browser_tab(tab_name: str = "") -> str:
     attach_to_input_desktop()
-    clean_tab = tab_name.strip()
-    logger.info("Switching to tab: %s", clean_tab)
-    focus_browser()
+    if not focus_browser():
+        return "Could not find an active browser window."
+
     time.sleep(0.08)
-
     pyautogui.hotkey("ctrl", "shift", "a")
-    time.sleep(0.15)
+    time.sleep(0.18)
 
-    if clean_tab and clean_tab.lower() not in ("check", "tabs", "all", "show", "open", ""):
+    clean_tab = tab_name.strip()
+    if clean_tab:
         pyautogui.write(clean_tab, interval=0.02)
         time.sleep(0.15)
         pyautogui.press("enter")
@@ -187,15 +181,21 @@ def search_or_open_website(query_or_url: str, site: str = "") -> str:
     attach_to_input_desktop()
     clean = query_or_url.strip()
     site_lower = site.lower().strip()
+    clean_lower = clean.lower()
 
-    if site_lower == "youtube" or "youtube.com" in clean.lower():
-        encoded = urllib.parse.quote_plus(clean)
-        url = f"https://www.youtube.com/results?search_query={encoded}"
-        label = f"YouTube search for '{clean}'"
-    elif clean.startswith("http://") or clean.startswith("https://"):
+    # Direct URL or homepage navigation
+    if clean.startswith("http://") or clean.startswith("https://"):
         url = clean
         label = clean
-    elif any(clean.endswith(ext) or ext + "/" in clean for ext in (".com", ".org", ".io", ".net", ".edu", ".gov", ".gg", ".ai")):
+    elif clean_lower in ("youtube", "youtube.com", "www.youtube.com"):
+        url = "https://www.youtube.com"
+        label = "YouTube homepage"
+    elif site_lower == "youtube" or clean_lower.startswith("youtube "):
+        search_term = clean.replace("youtube", "", 1).strip()
+        encoded = urllib.parse.quote_plus(search_term if search_term else clean)
+        url = f"https://www.youtube.com/results?search_query={encoded}"
+        label = f"YouTube search for '{search_term or clean}'"
+    elif any(clean.endswith(ext) or f"{ext}/" in clean for ext in (".com", ".org", ".io", ".net", ".edu", ".gov", ".gg", ".ai")):
         url = f"https://{clean}"
         label = url
     else:
@@ -259,31 +259,53 @@ def press_key(key: str, hold_duration: float = 0.06) -> str:
 def hold_key(key: str, duration: float = 1.0) -> str:
     attach_to_input_desktop()
     clean_key = key.strip().lower()
-    clamped_duration = max(0.05, min(duration, 15.0))
-    logger.info("Holding key: %s for %.2fs", clean_key, clamped_duration)
-    press_key(clean_key, hold_duration=clamped_duration)
-    return f"Held '{clean_key}' for {clamped_duration:.1f}s."
+    logger.info("Holding key: %s for %.2fs", clean_key, duration)
+
+    if "+" in clean_key:
+        keys = [k.strip() for k in clean_key.split("+")]
+        for k in keys:
+            mapped = "escape" if k == "esc" else k
+            if mapped in pydirectinput.KEYBOARD_MAPPING:
+                pydirectinput.keyDown(mapped)
+            else:
+                pyautogui.keyDown(k)
+        time.sleep(duration)
+        for k in reversed(keys):
+            mapped = "escape" if k == "esc" else k
+            if mapped in pydirectinput.KEYBOARD_MAPPING:
+                pydirectinput.keyUp(mapped)
+            else:
+                pyautogui.keyUp(k)
+    else:
+        mapped = "escape" if clean_key == "esc" else clean_key
+        if mapped in pydirectinput.KEYBOARD_MAPPING:
+            pydirectinput.keyDown(mapped)
+            time.sleep(duration)
+            pydirectinput.keyUp(mapped)
+        else:
+            pyautogui.keyDown(clean_key)
+            time.sleep(duration)
+            pyautogui.keyUp(clean_key)
+
+    return f"Held '{clean_key}' for {duration:.1f}s."
 
 
-def repeat_key(key: str, times: int = 1, interval: float = 0.12) -> str:
+def repeat_key(key: str, times: int = 1, interval: float = 0.08) -> str:
     attach_to_input_desktop()
     clean_key = key.strip().lower()
-    count = max(1, min(times, 20))
-    logger.info("Repeating key: %s %d times", clean_key, count)
-    for i in range(count):
-        press_key(clean_key, hold_duration=0.07)
-        if i < count - 1:
-            time.sleep(interval)
-    return f"Pressed '{clean_key}' {count} times."
+    logger.info("Repeating key: %s %d times", clean_key, times)
+    for _ in range(times):
+        press_key(clean_key)
+        time.sleep(interval)
+    return f"Pressed '{clean_key}' {times} times."
 
 
 def move_game(direction: str = "forward", duration: float = 1.5, sprint: bool = False) -> str:
-    attach_to_input_desktop()
-    clean_dir = direction.strip().lower()
+    clean_dir = direction.lower().strip()
     dir_map = {
         "forward": "w",
-        "front": "w",
         "ahead": "w",
+        "front": "w",
         "up": "w",
         "backward": "s",
         "back": "s",
@@ -299,23 +321,51 @@ def move_game(direction: str = "forward", duration: float = 1.5, sprint: bool = 
     return f"{mode} {clean_dir} for {duration:.1f}s."
 
 
+def _set_clipboard_text(text: str) -> bool:
+    try:
+        import pyperclip
+        pyperclip.copy(text)
+        return True
+    except Exception:
+        try:
+            import subprocess
+            process = subprocess.Popen('clip', stdin=subprocess.PIPE, shell=True)
+            process.communicate(text.encode('utf-16'))
+            return True
+        except Exception:
+            return False
+
+
 def type_text(text: str, press_enter: bool = False) -> str:
     attach_to_input_desktop()
-    logger.info("Typing text: %s", text)
+    logger.info("Typing text: %s", text[:60])
+
+    # Fast clipboard paste for long or formatted text (>12 chars)
+    if len(text) > 12:
+        if _set_clipboard_text(text):
+            time.sleep(0.04)
+            pyautogui.hotkey("ctrl", "v")
+            time.sleep(0.06)
+            if press_enter:
+                press_key("enter")
+            return f"Typed '{text}'."
+
+    # Direct typing fallback for short phrases
     for char in text:
         char_lower = char.lower()
         if char_lower in pydirectinput.KEYBOARD_MAPPING:
             try:
                 pydirectinput.keyDown(char_lower)
-                time.sleep(0.02)
+                time.sleep(0.01)
                 pydirectinput.keyUp(char_lower)
             except Exception:
                 pyautogui.write(char)
         else:
             pyautogui.write(char)
-        time.sleep(0.02)
+        time.sleep(0.01)
+
     if press_enter:
-        time.sleep(0.08)
+        time.sleep(0.05)
         press_key("enter")
     return f"Typed '{text}'."
 

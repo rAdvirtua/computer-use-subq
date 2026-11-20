@@ -263,9 +263,14 @@ def _check_local_hardware_reflex(text: str) -> Optional[Tuple[str, str]]:
             ack = press_key(raw_key)
             return ("press_key", ack)
 
-    if any(k in c for k in ("space bar", "spacebar", "space", "pause", "unpause", "play", "resume", "freeze")):
-        press_key("space")
-        return ("pause_resume", "Toggled playback.")
+    is_game_intent = any(k in c for k in ("game", "character", "play through", "autopilot", "shapes", "hexagon", "screen", "figure it out"))
+    if not is_game_intent:
+        if c in ("pause", "unpause", "play", "resume", "freeze", "toggle playback", "pause playback", "play music", "pause music", "stop music"):
+            press_key("space")
+            return ("pause_resume", "Toggled playback.")
+        elif any(k in c for k in ("space bar", "spacebar", "hit space", "press space", "tap space")):
+            press_key("space")
+            return ("press_key", "Pressed space.")
 
     elif any(k in c for k in ("mute", "unmute", "silence", "quiet")):
         press_key("m")
