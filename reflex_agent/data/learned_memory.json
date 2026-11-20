@@ -31,6 +31,35 @@
         "In confirmation prompts like Return to Title, use Enter to confirm, not mouse clicks.",
         "To save your game in Persona 3 Reload on PC, press the [Esc] key to open the main menu during free-roam or dungeon exploration. Then, use your mouse or navigation keys to select the \"System\" option, and choose \"Save\" to record your progress."
       ]
+    },
+    "active_app": {
+      "controls": {},
+      "successful_actions": {
+        "Click the blue button on the screen.": "Clicked at (1004, 721): Clicking the blue 'Play' button to launch the game as requested.",
+        "Click on the load slot or save file corresponding to the third save/sieve on screen.": "Clicked at (927, 490): Click on the third save slot to select it.",
+        "Look at the screen to see what is happening in the game and figure out what to do next.": "Pressed 'c': Press the talk button 'c' to talk to Aigis in the lounge.",
+        "Look at the screen to see where the character is and what objective or prompt is displayed, then figure out what to do.": "Held 'w' for 1.5s: Move the player forward toward the door in the Lounge.",
+        "Rotate the camera around to look at the surroundings and figure out where to go": "Held 'w' for 2.0s: Walk forward through the door to explore the lounge and surroundings",
+        "Look at the minimap and on-screen objective markers or UI to figure out where to go next.": "Held 'w' for 2.0s: Move the player forward through the lounge to explore or reach objective markers.",
+        "Look at the game screen to see what is currently happening and what we should do next.": "Held 'w' for 2.0s: Move the character forward in the lounge to explore or progress.",
+        "Look at the screen and see what option or prompt needs to be selected to do it again.": "Pressed 'c': Press 'C' key to check the Men's Room as prompted on the screen.",
+        "Look at the game screen to locate the Heo vending machine or surrounding path, and move the character towards it.": "Held 'w' for 2.0s: Move the character forward towards the vending machine area.",
+        "Look at the screen to see what is happening.": "Held 'w' for 2.0s: Move the character forward down the hallway towards the objective",
+        "Click on save slot two or option two on the screen.": "Clicked at (376, 625): Click on 'Two' message/option in the chat list as requested to click option two."
+      },
+      "failed_actions": {
+        "Look at the screen to check the character's surroundings and steer away from the wall._Held 'a' for 1.0s: Steer the character away from the wall to the left": 1,
+        "Look at the game screen to see why the character is stuck at the kitchen counter and press the movement keys to move away from it._Held 's' for 1.5s: Move away from the kitchen counter by walking backward.": 1,
+        "Click on the monitor icon to move the yellow arrow into it._Pressed 'e': Press the interact key to examine the cabinet or object as prompted by the game context.": 1,
+        "Look at the screen, locate the monitor icon, and click or interact with it._Goal completed: There is no monitor icon visible on the screen. The user is playing a video game (Persona 3 Reload), and the screen only displays the game environment and HUD.": 1,
+        "Click or press the key to perform the requested action again._Pressed 'c': Press the talk button to interact with Akihiko Sanada as shown on screen.": 1,
+        "Look for the counter with the lamppost or vase and move towards it._Held 'w' for 2.0s: Move the character forward toward the counter area": 1,
+        "Move the mouse cursor towards the right side of the screen_Clicked at (1536, 540): Move the mouse cursor towards the right side of the screen as requested": 1,
+        "Move the mouse cursor towards the left side of the screen._Clicked at (384, 540): Move the mouse cursor towards the left side of the screen as requested by the user.": 1,
+        "Type hello in the message box_Clicked at (816, 1038): Click inside the message input box to focus it before typing.": 1,
+        "Find the Persona 4 Golden icon on the desktop and double click it to open the game._Pressed 'esc': Dismiss or minimize the terminal / prompt to view the desktop where the Persona 4 Golden icon is located.": 1
+      },
+      "rules": []
     }
   },
   "stt_aliases": {
